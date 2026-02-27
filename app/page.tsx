@@ -37,6 +37,19 @@ interface PosterData {
   footerText: string;        // 底部引导文字
 }
 
+/** 历史记录条目接口 */
+interface HistoryItem {
+  id: string;               // 唯一标识
+  timestamp: number;        // 生成时间戳
+  thumbnail: string;        // 缩略图 base64（低质量，节省空间）
+  posterData: PosterData;   // 海报数据快照
+}
+
+/** localStorage 存储键名 */
+const HISTORY_KEY = "poster-generator-history";
+/** 最大历史记录条数 */
+const MAX_HISTORY = 20;
+
 // ============================================================
 // 常量配置
 // ============================================================
@@ -73,8 +86,8 @@ export default function PosterPage() {
     teacherComment:
       "俊瑞，你真是一位想象力丰富又勇敢的探险家！习作不仅有闻气味、辨毒草这些生动的细节，更棒的是写出了自己从害怕到变厉害的心理成长。你的文字充满了力量，让老师也想跟着你去探险了！",
     qrCode: "/qr-code.png",
-    phone: "电话：13912345678",
-    footerText: "报课请扫码咨询",
+    phone: "电话：13912345678\n报课请扫码咨询",
+    footerText: "",
   });
 
   /** Canvas 引用 */
@@ -94,6 +107,11 @@ export default function PosterPage() {
     imageRight: string;
   }>({ imageLeft: "", imageRight: "" });
 
+  // ---- 历史记录状态 ----
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedHistory, setSelectedHistory] = useState<HistoryItem | null>(null);
+
   // ---- OCR 识别相关状态 ----
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrDialogOpen, setOcrDialogOpen] = useState(false);
@@ -103,6 +121,8 @@ export default function PosterPage() {
   const [commentLoading, setCommentLoading] = useState(false);
 
   const ocrInputRef = useRef<HTMLInputElement>(null);
+  const replaceLeftRef = useRef<HTMLInputElement>(null);
+  const replaceRightRef = useRef<HTMLInputElement>(null);
 
   // ============================================================
   // 工具函数：多行文本折行计算
@@ -491,10 +511,14 @@ export default function PosterPage() {
     const qrBottom = qrY + qrSize;
     ctx.fillStyle = "#FFFFFF";
     ctx.textBaseline = "bottom";
+    // 联系信息：按换行拆分，逐行绘制，从二维码底部向上排列
     ctx.font = `22px "PingFang SC","Microsoft YaHei",sans-serif`;
-    ctx.fillText(posterData.footerText, textRightX, qrBottom);
-    ctx.font = `bold 24px "PingFang SC","Microsoft YaHei",sans-serif`;
-    ctx.fillText(posterData.phone, textRightX, qrBottom - 34);
+    const contactLines = posterData.phone.split("\n").filter(Boolean);
+    const lineH = 32;
+    for (let i = contactLines.length - 1; i >= 0; i--) {
+      const offsetY = qrBottom - (contactLines.length - 1 - i) * lineH;
+      ctx.fillText(contactLines[i], textRightX, offsetY);
+    }
 
     } catch (err) {
       console.error("海报绘制出错：", err);
@@ -559,12 +583,94 @@ export default function PosterPage() {
   };
 
   // ============================================================
+  // 历史记录：初始化加载
+  // ============================================================
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(HISTORY_KEY);
+      if (stored) {
+        setHistory(JSON.parse(stored));
+      }
+    } catch {
+      console.warn("读取历史记录失败");
+    }
+  }, []);
+
+  /** 保存历史记录到 localStorage */
+  const saveHistoryToStorage = useCallback((items: HistoryItem[]) => {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+    } catch {
+      console.warn("保存历史记录失败，可能存储空间不足");
+    }
+  }, []);
+
+  /** 添加一条历史记录（下载时调用） */
+  const addHistoryItem = useCallback((thumbnail: string) => {
+    const newItem: HistoryItem = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Date.now(),
+      thumbnail,
+      posterData: { ...posterData },
+    };
+    const updated = [newItem, ...history].slice(0, MAX_HISTORY);
+    setHistory(updated);
+    saveHistoryToStorage(updated);
+  }, [posterData, history, saveHistoryToStorage]);
+
+  /** 加载历史记录到表单 */
+  const loadHistoryItem = useCallback((item: HistoryItem) => {
+    setPosterData({ ...item.posterData });
+    // 清除裁切相关原始图片引用（历史快照已包含裁切后的图）
+    setOriginalImages({ imageLeft: null, imageRight: null });
+    setFileNames({ imageLeft: "", imageRight: "" });
+    setSelectedHistory(null);
+    setHistoryDialogOpen(false);
+    toast.success("已加载历史记录");
+  }, []);
+
+  /** 删除单条历史记录 */
+  const deleteHistoryItem = useCallback((id: string) => {
+    const updated = history.filter(item => item.id !== id);
+    setHistory(updated);
+    saveHistoryToStorage(updated);
+    // 如果正在预览被删的条目，关闭预览
+    if (selectedHistory?.id === id) {
+      setSelectedHistory(null);
+    }
+    toast.success("已删除该记录");
+  }, [history, saveHistoryToStorage, selectedHistory]);
+
+  /** 清空所有历史记录 */
+  const clearAllHistory = useCallback(() => {
+    setHistory([]);
+    saveHistoryToStorage([]);
+    setSelectedHistory(null);
+    toast.success("已清空所有历史记录");
+  }, [saveHistoryToStorage]);
+
+  // ============================================================
   // 下载海报
   // ============================================================
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // 生成缩略图（低质量 JPEG，节省 localStorage 空间）
+    const thumbCanvas = document.createElement("canvas");
+    const thumbScale = 150 / POSTER_WIDTH; // 缩略图宽 150px
+    thumbCanvas.width = 150;
+    thumbCanvas.height = canvas.height / (canvas.width / 150);
+    const thumbCtx = thumbCanvas.getContext("2d");
+    if (thumbCtx) {
+      thumbCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      const thumbnail = thumbCanvas.toDataURL("image/jpeg", 0.5);
+      addHistoryItem(thumbnail);
+    }
+
+    // 下载高清图
     const link = document.createElement("a");
     link.download = `海报_${posterData.studentInfo}_${Date.now()}.png`;
     link.href = canvas.toDataURL("image/png", 1.0);
@@ -719,6 +825,67 @@ export default function PosterPage() {
         </DialogContent>
       </Dialog>
 
+      {/* 历史记录详情弹窗 */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <svg className="w-5 h-5 text-[#ff7670]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              历史记录详情
+            </DialogTitle>
+            <DialogDescription>
+              {selectedHistory && (
+                <span>
+                  {new Date(selectedHistory.timestamp).toLocaleDateString("zh-CN")}
+                  {" "}
+                  {new Date(selectedHistory.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  {" · "}
+                  {selectedHistory.posterData.studentInfo}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedHistory && (
+            <div className="space-y-3">
+              {/* 缩略图预览 */}
+              <div className="flex justify-center bg-gray-50 rounded-lg p-3">
+                <img
+                  src={selectedHistory.thumbnail}
+                  alt="海报预览"
+                  className="max-h-[300px] rounded-md shadow-sm"
+                />
+              </div>
+              {/* 关键信息摘要 */}
+              <div className="text-xs text-gray-500 space-y-1 bg-gray-50 rounded-lg p-3">
+                <p><span className="text-gray-700 font-medium">馆名：</span>{selectedHistory.posterData.readingRoom}</p>
+                <p><span className="text-gray-700 font-medium">学员：</span>{selectedHistory.posterData.studentInfo}</p>
+                <p><span className="text-gray-700 font-medium">书目：</span>{selectedHistory.posterData.bookTitle}</p>
+                <p><span className="text-gray-700 font-medium">标题：</span>{selectedHistory.posterData.mainTitle}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+              onClick={() => { if (selectedHistory) { deleteHistoryItem(selectedHistory.id); setHistoryDialogOpen(false); } }}
+            >
+              <svg className="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              删除
+            </Button>
+            <Button
+              className="bg-[#ff7670] hover:bg-[#e5635d] text-white"
+              size="sm"
+              onClick={() => { if (selectedHistory) loadHistoryItem(selectedHistory); }}
+            >
+              <svg className="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              加载到编辑器
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 页面标题 */}
       <div className="max-w-[1400px] mx-auto mb-5">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -809,26 +976,24 @@ export default function PosterPage() {
             <CardContent className="space-y-2.5 pb-4">
               <div>
                 <Label className="text-xs">左侧插图</Label>
+                <input ref={replaceLeftRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "imageLeft")} />
                 {posterData.imageLeft ? (
                   <div className="mt-1 flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
                     <img
                       src={posterData.imageLeft}
                       alt="左侧插图"
                       className="w-14 h-14 object-cover rounded cursor-pointer border border-gray-300 hover:border-[#ff7670] transition"
-                      onClick={() => handleReEdit("imageLeft")}
-                      title="点击重新裁切"
+                      onClick={() => replaceLeftRef.current?.click()}
+                      title="点击替换图片"
                     />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => replaceLeftRef.current?.click()}>
                       <p className="text-xs text-gray-700 truncate">{fileNames.imageLeft || "已上传图片"}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">点击缩略图可重新裁切</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">点击替换 · 右侧编辑裁切</p>
                     </div>
-                    <div className="flex flex-col gap-1 shrink-0">
-                      <Button variant="outline" size="sm" onClick={() => handleReEdit("imageLeft")} className="h-7 text-xs px-2">
-                        <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        编辑
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleClearImage("imageLeft")} className="h-7 text-xs px-2 text-red-500 hover:text-red-600">清除</Button>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleReEdit("imageLeft")} className="h-7 text-xs px-2 shrink-0">
+                      <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      编辑
+                    </Button>
                   </div>
                 ) : (
                   <div className="mt-1">
@@ -839,26 +1004,24 @@ export default function PosterPage() {
 
               <div>
                 <Label className="text-xs">右侧手写稿</Label>
+                <input ref={replaceRightRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "imageRight")} />
                 {posterData.imageRight ? (
                   <div className="mt-1 flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
                     <img
                       src={posterData.imageRight}
                       alt="右侧手写稿"
                       className="w-14 h-14 object-cover rounded cursor-pointer border border-gray-300 hover:border-[#ff7670] transition"
-                      onClick={() => handleReEdit("imageRight")}
-                      title="点击重新裁切"
+                      onClick={() => replaceRightRef.current?.click()}
+                      title="点击替换图片"
                     />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => replaceRightRef.current?.click()}>
                       <p className="text-xs text-gray-700 truncate">{fileNames.imageRight || "已上传图片"}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">点击缩略图可重新裁切</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">点击替换 · 右侧编辑裁切</p>
                     </div>
-                    <div className="flex flex-col gap-1 shrink-0">
-                      <Button variant="outline" size="sm" onClick={() => handleReEdit("imageRight")} className="h-7 text-xs px-2">
-                        <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        编辑
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleClearImage("imageRight")} className="h-7 text-xs px-2 text-red-500 hover:text-red-600">清除</Button>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleReEdit("imageRight")} className="h-7 text-xs px-2 shrink-0">
+                      <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      编辑
+                    </Button>
                   </div>
                 ) : (
                   <div className="mt-1">
@@ -906,30 +1069,75 @@ export default function PosterPage() {
 
           {/* 底部信息 */}
           <Card>
-            <CardHeader className="pb-2 pt-4">
+            <CardHeader className="pb-2 pt-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <span className="w-1 h-3.5 bg-[#ff7670] rounded-full inline-block" />
                 底部信息
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2.5 pb-4">
-              <div>
-                <Label className="text-xs">二维码图片</Label>
-                <div className="mt-1 flex items-center gap-2">
-                  <Input type="file" accept="image/*" onChange={e => handleImageUpload(e, "qrCode")} className="text-xs h-9" />
-                  {posterData.qrCode && (
-                    <Button variant="ghost" size="sm" onClick={() => setPosterData(p => ({ ...p, qrCode: null }))} className="text-red-500 shrink-0 h-8 text-xs">清除</Button>
-                  )}
+            <CardContent className="space-y-2 pb-3">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs shrink-0 w-14">二维码</Label>
+                <Input type="file" accept="image/*" onChange={e => handleImageUpload(e, "qrCode")} className="text-xs h-8 flex-1" />
+                {posterData.qrCode && (
+                  <Button variant="ghost" size="sm" onClick={() => setPosterData(p => ({ ...p, qrCode: null }))} className="text-red-500 shrink-0 h-7 text-[10px] px-1.5">清除</Button>
+                )}
+              </div>
+              <div className="flex items-start gap-2">
+                <Label className="text-xs shrink-0 w-14 mt-1.5">联系信息</Label>
+                <Textarea value={posterData.phone} onChange={e => updateField("phone", e.target.value)} className="text-sm flex-1 min-h-[52px] resize-none" rows={2} placeholder="电话：13912345678&#10;报课请扫码咨询" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 生成历史记录 */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <span className="w-1 h-3.5 bg-[#ff7670] rounded-full inline-block" />
+                  生成历史
+                </span>
+                {history.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearAllHistory} className="h-6 text-[10px] px-2 text-gray-400 hover:text-red-500">
+                    清空
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-4">
+              {history.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">暂无历史记录，下载海报后自动保存</p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {history.map(item => (
+                    <div
+                      key={item.id}
+                      className="group relative cursor-pointer rounded-lg overflow-hidden border border-gray-200 hover:border-[#ff7670] transition-all hover:shadow-md"
+                      onClick={() => { setSelectedHistory(item); setHistoryDialogOpen(true); }}
+                    >
+                      {/* 缩略图 */}
+                      <img src={item.thumbnail} alt="历史海报" className="w-full aspect-[3/5] object-cover" />
+                      {/* 悬浮时间标签 */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-[9px] text-white text-center leading-tight">
+                          {new Date(item.timestamp).toLocaleDateString("zh-CN", { month: "short", day: "numeric" })}
+                          {" "}
+                          {new Date(item.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                      {/* 右上角删除按钮 */}
+                      <button
+                        className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                        onClick={(e) => { e.stopPropagation(); deleteHistoryItem(item.id); }}
+                        title="删除"
+                      >
+                        <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div>
-                <Label className="text-xs">联系电话</Label>
-                <Input value={posterData.phone} onChange={e => updateField("phone", e.target.value)} className="mt-1 h-9 text-sm" />
-              </div>
-              <div>
-                <Label className="text-xs">引导文字</Label>
-                <Input value={posterData.footerText} onChange={e => updateField("footerText", e.target.value)} className="mt-1 h-9 text-sm" />
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
