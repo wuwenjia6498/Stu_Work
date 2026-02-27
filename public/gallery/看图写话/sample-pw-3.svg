@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" rx="20" fill="#FFF5F7"/>
+  <ellipse cx="200" cy="160" rx="100" ry="70" fill="#ED64A6" opacity="0.12"/>
+  <circle cx="160" cy="150" r="20" fill="#ED64A6" opacity="0.25"/>
+  <circle cx="230" cy="140" r="28" fill="#ED64A6" opacity="0.2"/>
+  <rect x="130" y="240" width="140" height="50" rx="25" fill="#ED64A6" opacity="0.15"/>
+  <text x="200" y="340" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#B83280">看图写话 3</text>
+</svg>
+

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" rx="20" fill="#F0FFF0"/>
+  <ellipse cx="200" cy="180" rx="100" ry="70" fill="#48BB78" opacity="0.08"/>
+  <circle cx="160" cy="160" r="15" fill="#ED64A6" opacity="0.3"/>
+  <circle cx="240" cy="170" r="20" fill="#48BB78" opacity="0.2"/>
+  <rect x="120" y="240" width="160" height="40" rx="20" fill="#48BB78" opacity="0.1"/>
+  <text x="200" y="340" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#2F855A" font-weight="bold">夏洛的网 · 插图 2</text>
+</svg>
+

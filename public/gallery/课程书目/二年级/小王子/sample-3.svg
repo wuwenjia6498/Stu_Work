@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" rx="20" fill="#FFF5E6"/>
+  <path d="M100 300 Q200 100 300 300" fill="none" stroke="#DAA520" stroke-width="2" opacity="0.3"/>
+  <circle cx="200" cy="180" r="20" fill="#FFD700" opacity="0.3"/>
+  <circle cx="200" cy="180" r="8" fill="#FFD700" opacity="0.5"/>
+  <rect x="130" y="280" width="140" height="6" rx="3" fill="#DAA520" opacity="0.15"/>
+  <text x="200" y="340" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#DAA520" font-weight="bold">小王子 · 插图 3</text>
+</svg>
+

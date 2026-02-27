@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" rx="20" fill="#FFF5F5"/>
+  <rect x="100" y="80" width="200" height="160" rx="16" fill="#FF7670" opacity="0.1"/>
+  <circle cx="160" cy="150" r="30" fill="#FF7670" opacity="0.25"/>
+  <circle cx="240" cy="140" r="40" fill="#FFB347" opacity="0.2"/>
+  <rect x="130" y="200" width="140" height="20" rx="10" fill="#FF7670" opacity="0.15"/>
+  <text x="200" y="300" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#FF7670" font-weight="bold">玩具岛 · 插图 1</text>
+  <rect x="100" y="330" width="200" height="6" rx="3" fill="#FF7670" opacity="0.12"/>
+</svg>
+

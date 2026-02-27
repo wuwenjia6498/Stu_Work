@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import ImageCropper from "@/components/image-cropper";
+import { GALLERY_CATEGORIES } from "./gallery-data";
 
 // ============================================================
 // 类型定义
@@ -119,6 +120,12 @@ export default function PosterPage() {
 
   // ---- AI 生成评语相关状态 ----
   const [commentLoading, setCommentLoading] = useState(false);
+
+  // ---- 图库选择弹窗状态 ----
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryTab, setGalleryTab] = useState(GALLERY_CATEGORIES[0]?.id || "");   // 一级分类
+  const [galleryGrade, setGalleryGrade] = useState("");   // 二级：年级
+  const [galleryBook, setGalleryBook] = useState("");     // 三级：书名
 
   const ocrInputRef = useRef<HTMLInputElement>(null);
   const replaceLeftRef = useRef<HTMLInputElement>(null);
@@ -409,7 +416,7 @@ export default function PosterPage() {
           drawRoundRect(ctx, imgAreaX, drawY, leftW, imgH, 12);
           ctx.clip();
           const lImg = images["left"];
-          const s = Math.max(leftW / lImg.width, imgH / lImg.height);
+          const s = Math.max(leftW / lImg.width, imgH / lImg.height) * 0.85; // 缩小15%
           ctx.drawImage(lImg,
             imgAreaX + (leftW - lImg.width * s) / 2,
             drawY + (imgH - lImg.height * s) / 2,
@@ -563,10 +570,33 @@ export default function PosterPage() {
     e.target.value = "";
   };
 
-  const handleReEdit = (field: "imageLeft" | "imageRight") => {
-    const originalSrc = originalImages[field];
-    if (!originalSrc) return;
-    setCropImage(originalSrc);
+  const handleReEdit = async (field: "imageLeft" | "imageRight") => {
+    let src = originalImages[field];
+    if (!src) {
+      // 回退：使用当前 posterData 中的图片
+      const currentSrc = posterData[field];
+      if (!currentSrc) return;
+      // 如果是 URL（非 base64），先转为 base64 供裁切编辑器使用
+      if (!currentSrc.startsWith("data:")) {
+        try {
+          const response = await fetch(currentSrc);
+          const blob = await response.blob();
+          src = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          // 同时存入 originalImages，后续重新编辑无需再次转换
+          setOriginalImages(prev => ({ ...prev, [field]: src }));
+        } catch {
+          return;
+        }
+      } else {
+        src = currentSrc;
+        setOriginalImages(prev => ({ ...prev, [field]: src }));
+      }
+    }
+    setCropImage(src);
     setCropTarget(field);
   };
 
@@ -587,6 +617,22 @@ export default function PosterPage() {
   const handleCropCancel = () => {
     setCropImage(null);
     setCropTarget(null);
+  };
+
+  // ============================================================
+  // 图库选择：选中后进入裁切流程
+  // ============================================================
+
+  const handleGallerySelect = (imageSrc: string, imageName: string) => {
+    // 关闭图库弹窗
+    setGalleryOpen(false);
+    // 记录文件名
+    setFileNames(prev => ({ ...prev, imageLeft: imageName }));
+    // 保存原始图片（用于重新编辑）
+    setOriginalImages(prev => ({ ...prev, imageLeft: imageSrc }));
+    // 打开裁切弹窗
+    setCropImage(imageSrc);
+    setCropTarget("imageLeft");
   };
 
   // ============================================================
@@ -809,6 +855,155 @@ export default function PosterPage() {
   return (
     <div className="min-h-screen bg-[#f5f5f7] p-6">
       {/* 图片裁切弹窗 */}
+      {/* ========== 图库选择弹窗 ========== */}
+      <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-base">从图库选择插图</DialogTitle>
+            <DialogDescription className="text-xs text-gray-500">
+              选择一张图片后将进入裁切编辑
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* 一级分类 Tab 导航 */}
+          <div className="flex gap-1.5 border-b border-gray-100 pb-2">
+            {GALLERY_CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                  galleryTab === cat.id
+                    ? "bg-[#ff7670] text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+                onClick={() => {
+                  setGalleryTab(cat.id);
+                  if (cat.grades && cat.grades.length > 0) {
+                    setGalleryGrade(cat.grades[0].id);
+                    setGalleryBook(cat.grades[0].books?.[0]?.id || "");
+                  } else {
+                    setGalleryGrade("");
+                    setGalleryBook("");
+                  }
+                }}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 课程书目：二级年级 Tab + 三级书名下拉 */}
+          {(() => {
+            const activeCat = GALLERY_CATEGORIES.find(c => c.id === galleryTab);
+            if (!activeCat?.grades || activeCat.grades.length === 0) return null;
+
+            const activeGrade = activeCat.grades.find(g => g.id === galleryGrade);
+
+            return (
+              <div className="space-y-2">
+                {/* 年级 Tab */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {activeCat.grades.map(grade => (
+                    <button
+                      key={grade.id}
+                      className={`px-2.5 py-1 text-[11px] rounded-md transition-colors border ${
+                        galleryGrade === grade.id
+                          ? "bg-[#314F80] text-white border-[#314F80] shadow-sm"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-[#314F80] hover:text-[#314F80]"
+                      }`}
+                      onClick={() => {
+                        setGalleryGrade(grade.id);
+                        setGalleryBook(grade.books?.[0]?.id || "");
+                      }}
+                    >
+                      {grade.label}
+                      <span className="ml-1 opacity-50">({grade.books.length})</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 书名下拉选择（每年级 20-40 本书，用下拉更合适） */}
+                {activeGrade && activeGrade.books.length > 0 && (
+                  <select
+                    value={galleryBook}
+                    onChange={e => setGalleryBook(e.target.value)}
+                    className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#ff7670] focus:border-[#ff7670] cursor-pointer"
+                  >
+                    {activeGrade.books.map(book => (
+                      <option key={book.id} value={book.id}>
+                        {book.label}（{book.images.length} 张）
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* 该年级无书目提示 */}
+                {activeGrade && activeGrade.books.length === 0 && (
+                  <div className="text-xs text-gray-400 py-1">该年级暂未添加书目</div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 图片网格 */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {(() => {
+              const activeCat = GALLERY_CATEGORIES.find(c => c.id === galleryTab);
+
+              // 根据分类类型获取当前图片列表
+              let currentImages: { src: string; name: string }[] = [];
+              if (activeCat?.grades) {
+                // 课程书目：三级结构
+                const activeGrade = activeCat.grades.find(g => g.id === galleryGrade);
+                const activeBook = activeGrade?.books.find(b => b.id === galleryBook);
+                currentImages = activeBook?.images ?? [];
+              } else {
+                // 看图写话 / 通用素材：一级平铺
+                currentImages = activeCat?.images ?? [];
+              }
+
+              if (currentImages.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                    <svg className="w-10 h-10 mb-2 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                    <p className="text-xs">暂无图片</p>
+                    <p className="text-[10px] mt-1">请将图片放入对应的 public/gallery/ 目录并更新配置</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-3 gap-3 p-1">
+                  {currentImages.map((img) => (
+                    <button
+                      key={img.src}
+                      className="group relative aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-[#ff7670] transition-all bg-gray-50"
+                      onClick={() => handleGallerySelect(img.src, img.name)}
+                      title={img.name}
+                    >
+                      <img
+                        src={img.src}
+                        alt={img.name}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-center">
+                        <span className="text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity pb-2 px-2 text-center leading-tight drop-shadow">
+                          {img.name}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* 底部提示 */}
+          <div className="text-[10px] text-gray-400 text-center pt-2 border-t border-gray-100">
+            图片目录：public/gallery/分类/年级/书名/ · 配置文件：app/gallery-data.ts
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {cropImage && cropTarget && (
         <ImageCropper
           imageSrc={cropImage}
@@ -829,10 +1024,6 @@ export default function PosterPage() {
             <DialogDescription>
               请核对识别结果，可直接在下方编辑修改，确认后将填入习作正文。
             </DialogDescription>
-            <div className="flex items-start gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700 leading-relaxed">
-              <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <span>手写体识别可能存在偏差，建议与原稿逐字比对后再确认，以确保内容准确无误。</span>
-            </div>
           </DialogHeader>
           <Textarea
             value={ocrResult}
@@ -993,6 +1184,11 @@ export default function PosterPage() {
                   />
                 </div>
                 <Textarea value={posterData.content} onChange={e => updateField("content", e.target.value)} className="mt-1 min-h-[200px] text-sm" placeholder="支持换行，也可上传手写稿自动识别（支持多张）" />
+                {/* OCR 提示：移至正文框下方 */}
+                <div className="flex items-start gap-1.5 px-2.5 py-1.5 mt-1.5 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-700 leading-relaxed">
+                  <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <span>手写体识别可能存在偏差，建议与原稿逐字比对，以确保内容准确无误。</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1007,29 +1203,83 @@ export default function PosterPage() {
             </CardHeader>
             <CardContent className="space-y-2.5 pb-4">
               <div>
-                <Label className="text-xs">左侧插图 <span className="text-gray-400 font-normal">{posterData.bookTitle.trim() ? "（上传课程书目相关图片）" : "（上传看图写话中的图片）"}</span></Label>
+                <Label className="text-xs">左侧插图</Label>
                 <input ref={replaceLeftRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "imageLeft")} />
+
                 {posterData.imageLeft ? (
-                  <div className="mt-1 flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
-                    <img
-                      src={posterData.imageLeft}
-                      alt="左侧插图"
-                      className="w-14 h-14 object-cover rounded cursor-pointer border border-gray-300 hover:border-[#ff7670] transition"
-                      onClick={() => replaceLeftRef.current?.click()}
-                      title="点击替换图片"
-                    />
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => replaceLeftRef.current?.click()}>
-                      <p className="text-xs text-gray-700 truncate">{fileNames.imageLeft || "已上传图片"}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">点击替换 · 右侧编辑裁切</p>
+                  /* ---- 已选图片：显示预览 + 三个操作按钮 ---- */
+                  <div className="mt-1.5 space-y-1.5">
+                    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                      <img
+                        src={posterData.imageLeft}
+                        alt="左侧插图"
+                        className="w-14 h-14 object-cover rounded border border-gray-300"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-700 truncate">{fileNames.imageLeft || "已选择图片"}</p>
+                      </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => handleReEdit("imageLeft")} className="h-7 text-xs px-2 shrink-0">
-                      <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      编辑
-                    </Button>
+                    {/* 三个操作按钮：编辑（裁切）、从图库选择、本地替换 */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        className="flex items-center justify-center gap-1 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-xs text-gray-600 hover:text-gray-900 cursor-pointer"
+                        onClick={() => handleReEdit("imageLeft")}
+                        title="裁切编辑"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        编辑
+                      </button>
+                      <button
+                        className="flex items-center justify-center gap-1 py-1.5 rounded-md border border-[#ff7670]/50 bg-white hover:bg-[#fff5f5] transition-colors text-xs text-[#ff7670] cursor-pointer"
+                        onClick={() => {
+                          const first = GALLERY_CATEGORIES[0];
+                          setGalleryTab(first?.id || "");
+                          const firstGrade = first?.grades?.[0];
+                          setGalleryGrade(firstGrade?.id || "");
+                          setGalleryBook(firstGrade?.books?.[0]?.id || "");
+                          setGalleryOpen(true);
+                        }}
+                        title="从图库选择"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                        内置图库
+                      </button>
+                      <button
+                        className="flex items-center justify-center gap-1 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-xs text-gray-600 hover:text-gray-900 cursor-pointer"
+                        onClick={() => replaceLeftRef.current?.click()}
+                        title="本地上传"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        本地上传
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="mt-1">
-                    <Input type="file" accept="image/*" onChange={e => handleImageUpload(e, "imageLeft")} className="text-xs h-9" />
+                  /* ---- 未选图片：两个入口按钮 ---- */
+                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                    {/* 从图库选择 */}
+                    <button
+                      className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-lg border-2 border-dashed border-[#ff7670]/40 bg-[#fff5f5]/50 hover:border-[#ff7670] hover:bg-[#fff5f5] transition-colors cursor-pointer group"
+                      onClick={() => {
+                        const first = GALLERY_CATEGORIES[0];
+                        setGalleryTab(first?.id || "");
+                        const firstGrade = first?.grades?.[0];
+                        setGalleryGrade(firstGrade?.id || "");
+                        setGalleryBook(firstGrade?.books?.[0]?.id || "");
+                        setGalleryOpen(true);
+                      }}
+                    >
+                      <svg className="w-6 h-6 text-[#ff7670]/60 group-hover:text-[#ff7670] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                      <span className="text-xs text-[#ff7670]/70 group-hover:text-[#ff7670] font-medium">从图库选择</span>
+                    </button>
+                    {/* 本地上传 */}
+                    <button
+                      className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50 hover:border-gray-400 hover:bg-gray-50 transition-colors cursor-pointer group"
+                      onClick={() => replaceLeftRef.current?.click()}
+                    >
+                      <svg className="w-6 h-6 text-gray-400 group-hover:text-gray-600 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      <span className="text-xs text-gray-400 group-hover:text-gray-600 font-medium">本地上传</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1196,6 +1446,10 @@ export default function PosterPage() {
             下载海报
           </Button>
         </div>
+      </div>
+      {/* 页面底部 Footer */}
+      <div className="mt-8 pb-6 text-center text-xs text-gray-400 select-none">
+        © 2026 老约翰儿童阅读
       </div>
     </div>
   );

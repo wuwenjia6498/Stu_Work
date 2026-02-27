@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" rx="20" fill="#ECFDF5"/>
+  <rect x="100" y="100" width="200" height="180" rx="16" fill="#48BB78" opacity="0.08"/>
+  <path d="M150 180 Q200 120 250 180 Q200 240 150 180" fill="#48BB78" opacity="0.15"/>
+  <circle cx="200" cy="180" r="10" fill="#ED64A6" opacity="0.35"/>
+  <rect x="140" y="300" width="120" height="6" rx="3" fill="#48BB78" opacity="0.15"/>
+  <text x="200" y="350" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#2F855A" font-weight="bold">夏洛的网 · 插图 3</text>
+</svg>
+
