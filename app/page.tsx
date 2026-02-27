@@ -205,7 +205,7 @@ export default function PosterPage() {
 
     // 头部：curY=72, logoH=100, infoY=192, 3行×42=126, 底部≈318，留余量至334
     const headerHeight = 334;
-    const headerBoardGap = 16;
+    const headerBoardGap = 6;
 
     const boardPaddingTop = 36;
     const boardPaddingBottom = 36;
@@ -395,17 +395,11 @@ export default function PosterPage() {
         if (images["right"]) {
           const rImg = images["right"];
 
-          // 红色圆形描边（带阴影）
-          ctx.save();
-          ctx.shadowColor = "rgba(0,0,0,0.12)";
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 3;
+          // 红色圆形描边（无阴影）
           ctx.beginPath();
           ctx.arc(circleCX, circleCY, circleRadius, 0, Math.PI * 2);
           ctx.fillStyle = THEME_COLOR;
           ctx.fill();
-          ctx.restore();
 
           // 白色内衬圆
           ctx.beginPath();
