@@ -360,63 +360,71 @@ export default function PosterPage() {
       const imgAreaX = drawX;
 
       if (hasLeft && hasRight) {
-        const gap = 16;
-        const singleW = (imgAreaW - gap) / 2;
         const imgH = imageMaxHeight;
 
+        // ---- 右侧圆形手写稿参数 ----
+        const circleDiameter = 340;  // 更大的圆形直径
+        const circleBorder = 8;     // 红色描边粗度
+        const circleRadius = circleDiameter / 2;
+        // 圆心向右偏移，让圆形右侧超出白板边缘（产生裁切效果）
+        const circleOverflow = 80;   // 超出白板右边缘的距离
+        const circleCX = boardX + boardW - circleRadius + circleOverflow;
+        const circleCY = drawY + imgH / 2; // 垂直居中
+
+        // 左侧插图宽度：留出圆形在白板内的可见部分
+        const gap = 16;
+        const circleVisibleW = circleDiameter - circleOverflow; // 圆形在白板内可见宽度
+        const leftW = imgAreaW - circleVisibleW - gap + BOARD_PADDING_X;
+
+        // ---- 左侧插图（圆角矩形） ----
         if (images["left"]) {
           ctx.save();
-          drawRoundRect(ctx, imgAreaX, drawY, singleW, imgH, 12);
+          drawRoundRect(ctx, imgAreaX, drawY, leftW, imgH, 12);
           ctx.clip();
           const lImg = images["left"];
-          const s = Math.max(singleW / lImg.width, imgH / lImg.height);
+          const s = Math.max(leftW / lImg.width, imgH / lImg.height);
           ctx.drawImage(lImg,
-            imgAreaX + (singleW - lImg.width * s) / 2,
+            imgAreaX + (leftW - lImg.width * s) / 2,
             drawY + (imgH - lImg.height * s) / 2,
             lImg.width * s, lImg.height * s
           );
           ctx.restore();
         }
 
+        // ---- 右侧手写稿（大圆形 + 超出白板右侧裁切效果） ----
         if (images["right"]) {
-          const rightX = imgAreaX + singleW + gap;
           const rImg = images["right"];
 
+          // 红色圆形描边（带阴影）
           ctx.save();
-          ctx.shadowColor = "rgba(0,0,0,0.10)";
-          ctx.shadowBlur = 8;
+          ctx.shadowColor = "rgba(0,0,0,0.12)";
+          ctx.shadowBlur = 12;
           ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 4;
-          ctx.fillStyle = "#FFFFFF";
-          drawRoundRect(ctx, rightX, drawY, singleW, imgH, 4);
+          ctx.shadowOffsetY = 3;
+          ctx.beginPath();
+          ctx.arc(circleCX, circleCY, circleRadius, 0, Math.PI * 2);
+          ctx.fillStyle = THEME_COLOR;
           ctx.fill();
           ctx.restore();
 
-          const pad = 8;
+          // 白色内衬圆
+          ctx.beginPath();
+          ctx.arc(circleCX, circleCY, circleRadius - circleBorder, 0, Math.PI * 2);
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fill();
+
+          // 圆形裁切绘制图片
+          const clipR = circleRadius - circleBorder - 2;
           ctx.save();
-          drawRoundRect(ctx, rightX + pad, drawY + pad, singleW - pad * 2, imgH - pad * 2, 2);
+          ctx.beginPath();
+          ctx.arc(circleCX, circleCY, clipR, 0, Math.PI * 2);
           ctx.clip();
-          const rs = Math.max((singleW - pad * 2) / rImg.width, (imgH - pad * 2) / rImg.height);
+          const rs = Math.max((clipR * 2) / rImg.width, (clipR * 2) / rImg.height);
           ctx.drawImage(rImg,
-            rightX + pad + (singleW - pad * 2 - rImg.width * rs) / 2,
-            drawY + pad + (imgH - pad * 2 - rImg.height * rs) / 2,
+            circleCX - (rImg.width * rs) / 2,
+            circleCY - (rImg.height * rs) / 2,
             rImg.width * rs, rImg.height * rs
           );
-          ctx.restore();
-
-          const tapeW = 40;
-          const tapeH = 16;
-          ctx.save();
-          ctx.translate(rightX + 20, drawY - 4);
-          ctx.rotate(-0.15);
-          ctx.fillStyle = "rgba(200,180,140,0.7)";
-          ctx.fillRect(0, 0, tapeW, tapeH);
-          ctx.restore();
-          ctx.save();
-          ctx.translate(rightX + singleW - 60, drawY - 4);
-          ctx.rotate(0.12);
-          ctx.fillStyle = "rgba(200,180,140,0.7)";
-          ctx.fillRect(0, 0, tapeW, tapeH);
           ctx.restore();
         }
       } else {
