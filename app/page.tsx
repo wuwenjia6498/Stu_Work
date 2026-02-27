@@ -223,7 +223,7 @@ export default function PosterPage() {
 
     // ------ 预计算各区块高度 ------
 
-    // 头部：curY=72, logoH=100, infoY=192, 3行×42=126, 底部≈318，留余量至334
+    // 头部：curY=72, logoH=100, infoY=192, 3行×42=126, 留余量至334
     const headerHeight = 334;
     const headerBoardGap = 6;
 
@@ -326,7 +326,14 @@ export default function PosterPage() {
     const infoLineH = 42;
     ctx.fillText(`\u9986\u3000\u540d\uff1a${posterData.readingRoom}`, infoX, infoY);
     ctx.fillText(`\u5b66\u3000\u5458\uff1a${posterData.studentInfo}`, infoX, infoY + infoLineH);
-    ctx.fillText(`\u4e66\u3000\u76ee\uff1a${posterData.bookTitle}`, infoX, infoY + infoLineH * 2);
+    // 书目为空时，第三行显示"看图写话"（字体加大加粗）
+    if (posterData.bookTitle.trim()) {
+      ctx.fillText(`\u4e66\u3000\u76ee\uff1a${posterData.bookTitle}`, infoX, infoY + infoLineH * 2);
+    } else {
+      ctx.font = `bold 36px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.fillText(`\u770b\u56fe\u5199\u8bdd`, infoX, infoY + infoLineH * 2 + 10);
+      ctx.font = `${labelFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    }
 
     curY = headerHeight;
 
@@ -690,42 +697,58 @@ export default function PosterPage() {
   // ============================================================
 
   const handleOcrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // 先将 FileList 复制到普通数组（清空 input.value 会导致 FileList 引用失效）
+    const fileArray = Array.from(files);
     e.target.value = "";
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
-      setOcrLoading(true);
+    // 限制最多 5 张
+    if (fileArray.length > 5) {
+      toast.warning("最多支持 5 张图片，请减少选择数量");
+      return;
+    }
 
-      try {
-        const res = await fetch("/api/ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "ocr", imageBase64: base64 }),
-        });
+    setOcrLoading(true);
 
-        const data = await res.json();
-        if (!res.ok) {
-          toast.error(data.error || "OCR 识别失败，请重试");
-          return;
-        }
+    try {
+      // 读取所有图片为 base64
+      const base64List = await Promise.all(
+        fileArray.map(
+          (file) =>
+            new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            })
+        )
+      );
 
-        setOcrResult(data.result || "");
-        setOcrDialogOpen(true);
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "ocr", imageBase64List: base64List }),
+      });
 
-        // 如果后端检测到输出被截断，弹窗打开后再提示
-        if (data.warning) {
-          setTimeout(() => toast.warning(data.warning), 300);
-        }
-      } catch {
-        toast.error("网络错误，请检查网络连接后重试");
-      } finally {
-        setOcrLoading(false);
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "OCR 识别失败，请重试");
+        return;
       }
-    };
-    reader.readAsDataURL(file);
+
+      setOcrResult(data.result || "");
+      setOcrDialogOpen(true);
+
+      // 如果后端检测到输出被截断，弹窗打开后再提示
+      if (data.warning) {
+        setTimeout(() => toast.warning(data.warning), 300);
+      }
+    } catch {
+      toast.error("网络错误，请检查网络连接后重试");
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   const handleOcrConfirm = () => {
@@ -758,6 +781,8 @@ export default function PosterPage() {
             type: "comment",
             content: posterData.content,
             studentInfo: posterData.studentInfo,
+            bookTitle: posterData.bookTitle,
+            mainTitle: posterData.mainTitle,
           }),
         });
 
@@ -804,6 +829,10 @@ export default function PosterPage() {
             <DialogDescription>
               请核对识别结果，可直接在下方编辑修改，确认后将填入习作正文。
             </DialogDescription>
+            <div className="flex items-start gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700 leading-relaxed">
+              <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>手写体识别可能存在偏差，建议与原稿逐字比对后再确认，以确保内容准确无误。</span>
+            </div>
           </DialogHeader>
           <Textarea
             value={ocrResult}
@@ -859,7 +888,9 @@ export default function PosterPage() {
               <div className="text-xs text-gray-500 space-y-1 bg-gray-50 rounded-lg p-3">
                 <p><span className="text-gray-700 font-medium">馆名：</span>{selectedHistory.posterData.readingRoom}</p>
                 <p><span className="text-gray-700 font-medium">学员：</span>{selectedHistory.posterData.studentInfo}</p>
-                <p><span className="text-gray-700 font-medium">书目：</span>{selectedHistory.posterData.bookTitle}</p>
+                {selectedHistory.posterData.bookTitle?.trim() && (
+                  <p><span className="text-gray-700 font-medium">书目：</span>{selectedHistory.posterData.bookTitle}</p>
+                )}
                 <p><span className="text-gray-700 font-medium">标题：</span>{selectedHistory.posterData.mainTitle}</p>
               </div>
             </div>
@@ -917,8 +948,8 @@ export default function PosterPage() {
                 <Input value={posterData.studentInfo} onChange={e => updateField("studentInfo", e.target.value)} className="mt-1 h-9 text-sm" />
               </div>
               <div>
-                <Label className="text-xs">阅读书目</Label>
-                <Input value={posterData.bookTitle} onChange={e => updateField("bookTitle", e.target.value)} className="mt-1 h-9 text-sm" />
+                <Label className="text-xs">课程书目 <span className="text-gray-400 font-normal">（选填，看图写话可留空）</span></Label>
+                <Input value={posterData.bookTitle} onChange={e => updateField("bookTitle", e.target.value)} className="mt-1 h-9 text-sm" placeholder="如为看图写话，可不填" />
               </div>
             </CardContent>
           </Card>
@@ -950,17 +981,18 @@ export default function PosterPage() {
                     ) : (
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h6"/><path d="M9 17h3"/></svg>
                     )}
-                    {ocrLoading ? "识别中..." : "上传手写稿识别"}
+                    {ocrLoading ? "识别中..." : "手写稿识别"}
                   </Button>
                   <input
                     ref={ocrInputRef}
                     type="file"
                     accept="image/*"
+                    multiple
                     className="hidden"
                     onChange={handleOcrUpload}
                   />
                 </div>
-                <Textarea value={posterData.content} onChange={e => updateField("content", e.target.value)} className="mt-1 min-h-[200px] text-sm" placeholder="支持换行，也可上传手写稿自动识别" />
+                <Textarea value={posterData.content} onChange={e => updateField("content", e.target.value)} className="mt-1 min-h-[200px] text-sm" placeholder="支持换行，也可上传手写稿自动识别（支持多张）" />
               </div>
             </CardContent>
           </Card>
@@ -975,7 +1007,7 @@ export default function PosterPage() {
             </CardHeader>
             <CardContent className="space-y-2.5 pb-4">
               <div>
-                <Label className="text-xs">左侧插图</Label>
+                <Label className="text-xs">左侧插图 <span className="text-gray-400 font-normal">{posterData.bookTitle.trim() ? "（上传课程书目相关图片）" : "（上传看图写话中的图片）"}</span></Label>
                 <input ref={replaceLeftRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "imageLeft")} />
                 {posterData.imageLeft ? (
                   <div className="mt-1 flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
@@ -1063,6 +1095,10 @@ export default function PosterPage() {
                   </Button>
                 </div>
                 <Textarea value={posterData.teacherComment} onChange={e => updateField("teacherComment", e.target.value)} className="mt-1 min-h-[86px] text-sm" placeholder="可手动输入，也可点击「AI 智能生成」自动生成" />
+                <div className="flex items-start gap-1.5 px-2.5 py-1.5 mt-1.5 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-700 leading-relaxed">
+                  <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <span>如果是系统生成的评语，请结合实际情况审核，确保评语准确贴切。</span>
+                </div>
               </div>
             </CardContent>
           </Card>
