@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import ImageCropper from "@/components/image-cropper";
-import { GALLERY_CATEGORIES } from "./gallery-data";
+import type { GalleryCategory } from "./gallery-data";
 
 // ============================================================
 // 类型定义
@@ -73,6 +73,12 @@ const BOARD_TEXT_WIDTH = POSTER_WIDTH - PADDING_X * 2 - BOARD_PADDING_X * 2;
 // ============================================================
 
 export default function PosterPage() {
+  // ---- 模板样式状态：'classic' 品牌橙红 | 'minimalist' 简约留白 ----
+  const [templateStyle, setTemplateStyle] = useState<'classic' | 'minimalist'>('classic');
+
+  // ---- 使用指南弹窗状态 ----
+  const [guideOpen, setGuideOpen] = useState(false);
+
   // ---- 海报数据状态 ----
   const [posterData, setPosterData] = useState<PosterData>({
     readingRoom: "常德桃源县老约翰阅读馆",
@@ -87,7 +93,7 @@ export default function PosterPage() {
     teacherComment:
       "俊瑞，你真是一位想象力丰富又勇敢的探险家！习作不仅有闻气味、辨毒草这些生动的细节，更棒的是写出了自己从害怕到变厉害的心理成长。你的文字充满了力量，让老师也想跟着你去探险了！",
     qrCode: "/qr-code.png",
-    phone: "电话：13912345678\n报课请扫码咨询",
+    phone: "",
     footerText: "",
   });
 
@@ -121,9 +127,13 @@ export default function PosterPage() {
   // ---- AI 生成评语相关状态 ----
   const [commentLoading, setCommentLoading] = useState(false);
 
+  // ---- 图库数据（从 API 动态加载） ----
+  const [galleryCategories, setGalleryCategories] = useState<GalleryCategory[]>([]);
+  const [galleryLoaded, setGalleryLoaded] = useState(false);
+
   // ---- 图库选择弹窗状态 ----
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const [galleryTab, setGalleryTab] = useState(GALLERY_CATEGORIES[0]?.id || "");   // 一级分类
+  const [galleryTab, setGalleryTab] = useState("");   // 一级分类
   const [galleryGrade, setGalleryGrade] = useState("");   // 二级：年级
   const [galleryBook, setGalleryBook] = useState("");     // 三级：书名
 
@@ -219,6 +229,7 @@ export default function PosterPage() {
 
     const imagePromises: Record<string, Promise<HTMLImageElement>> = {};
     imagePromises["logo"] = loadImage("/logo.png");
+    imagePromises["logo01"] = loadImage("/logo01.png");
     if (posterData.imageLeft)  imagePromises["left"]  = loadImage(posterData.imageLeft);
     if (posterData.imageRight) imagePromises["right"] = loadImage(posterData.imageRight);
     if (posterData.qrCode)     imagePromises["qr"]    = loadImage(posterData.qrCode);
@@ -228,53 +239,51 @@ export default function PosterPage() {
     const images: Record<string, HTMLImageElement | null> = {};
     imageKeys.forEach((k, i) => { images[k] = imageValues[i]; });
 
-    // ------ 预计算各区块高度 ------
+    // ------ 公共预计算参数 ------
+    const hasLeft = !!images["left"];
+    const hasRight = !!images["right"];
+    const imageMaxHeight = 300;
+    const offCanvas = document.createElement("canvas");
+    offCanvas.width = 1; offCanvas.height = 1;
+    const offCtx = offCanvas.getContext("2d")!;
 
-    // 头部：curY=72, logoH=100, infoY=192, 3行×42=126, 留余量至334
+    // ====================================================================
+    // 经典粉红模板 (classic)
+    // ====================================================================
+    if (templateStyle === 'classic') {
+
     const headerHeight = 334;
     const headerBoardGap = 6;
-
     const boardPaddingTop = 36;
     const boardPaddingBottom = 36;
-
     const titleFontSize = 32;
     const titleLineHeight = 46;
     const contentFontSize = 26;
     const contentLineHeight = 44;
 
-    const offCanvas = document.createElement("canvas");
-    offCanvas.width = 1; offCanvas.height = 1;
-    const offCtx = offCanvas.getContext("2d")!;
-
     offCtx.font = `bold ${titleFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
     const titleWrapped = wrapText(offCtx, posterData.mainTitle, BOARD_TEXT_WIDTH, titleLineHeight);
-
     const titleContentGap = 16;
 
     offCtx.font = `${contentFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
     const contentWrapped = wrapText(offCtx, posterData.content, BOARD_TEXT_WIDTH, contentLineHeight);
 
     const contentImageGap = 24;
-    const hasLeft = !!images["left"];
-    const hasRight = !!images["right"];
-    const imageMaxHeight = 300;
     let imageAreaHeight = 0;
     if (hasLeft || hasRight) {
       imageAreaHeight = imageMaxHeight + contentImageGap * 2;
     }
 
     const imageCommentGap = (hasLeft || hasRight) ? 8 : 16;
-    const commentTitleFontSize = 28;
-    const commentTitleLineHeight = 42;
-    const commentFontSize = 24;
-    const commentLineHeight = 40;
+    const commentTitleFontSize = 27;
+    const commentTitleLineHeight = 41;
+    const commentFontSize = 23;
+    const commentLineHeight = 39;
 
     offCtx.font = `bold ${commentTitleFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
     const commentTitleWrapped = wrapText(offCtx, posterData.teacherName, BOARD_TEXT_WIDTH, commentTitleLineHeight);
-
     offCtx.font = `${commentFontSize}px "SimSun","STSong","Songti SC",serif`;
     const commentWrapped = wrapText(offCtx, posterData.teacherComment, BOARD_TEXT_WIDTH, commentLineHeight);
-
     const commentGap = 6;
 
     const boardH =
@@ -289,7 +298,6 @@ export default function PosterPage() {
 
     const boardFooterGap = 24;
     const footerHeight = 160;
-
     const totalHeight = headerHeight + headerBoardGap + boardH + boardFooterGap + footerHeight + 20;
 
     canvas.width = POSTER_WIDTH * dpr;
@@ -301,13 +309,10 @@ export default function PosterPage() {
     canvas.style.height = `${totalHeight * scale}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Step 1: 粉红背景
     ctx.fillStyle = THEME_COLOR;
     ctx.fillRect(0, 0, POSTER_WIDTH, totalHeight);
 
-    // Step 2: 头部区域（顶部多留半倍空间：48→72）
     let curY = 72;
-
     const logoW = 260;
     const logoH = 100;
     const logoX = PADDING_X;
@@ -331,11 +336,20 @@ export default function PosterPage() {
 
     const infoX = PADDING_X + 8;
     const infoLineH = 42;
-    ctx.fillText(`\u9986\u3000\u540d\uff1a${posterData.readingRoom}`, infoX, infoY);
-    ctx.fillText(`\u5b66\u3000\u5458\uff1a${posterData.studentInfo}`, infoX, infoY + infoLineH);
-    // 书目为空时，第三行显示"看图写话"（字体加大加粗）
+
+    // 辅助函数：标签加粗 + 内容正常，同行绘制
+    const drawInfoLine = (label: string, value: string, x: number, y: number, fontSize: number) => {
+      ctx.font = `bold ${fontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.fillText(label, x, y);
+      const labelW = ctx.measureText(label).width;
+      ctx.font = `${fontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.fillText(value, x + labelW, y);
+    };
+
+    drawInfoLine("\u9986\u3000\u540d\uff1a", posterData.readingRoom, infoX, infoY, labelFontSize);
+    drawInfoLine("\u5b66\u3000\u5458\uff1a", posterData.studentInfo, infoX, infoY + infoLineH, labelFontSize);
     if (posterData.bookTitle.trim()) {
-      ctx.fillText(`\u4e66\u3000\u76ee\uff1a${posterData.bookTitle}`, infoX, infoY + infoLineH * 2);
+      drawInfoLine("\u4e66\u3000\u76ee\uff1a", posterData.bookTitle, infoX, infoY + infoLineH * 2, labelFontSize);
     } else {
       ctx.font = `bold 36px "PingFang SC","Microsoft YaHei",sans-serif`;
       ctx.fillText(`\u770b\u56fe\u5199\u8bdd`, infoX, infoY + infoLineH * 2 + 10);
@@ -344,7 +358,6 @@ export default function PosterPage() {
 
     curY = headerHeight;
 
-    // Step 3: 白色圆角底板
     const boardX = PADDING_X;
     const boardY = curY + headerBoardGap;
     const boardW = POSTER_WIDTH - PADDING_X * 2;
@@ -356,7 +369,6 @@ export default function PosterPage() {
     let drawY = boardY + boardPaddingTop;
     const drawX = boardX + BOARD_PADDING_X;
 
-    // Step 4: 主标题
     ctx.fillStyle = "#222222";
     ctx.font = `bold ${titleFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
     ctx.textAlign = "center";
@@ -375,7 +387,6 @@ export default function PosterPage() {
     ctx.stroke();
     drawY += titleContentGap;
 
-    // Step 5: 正文
     ctx.fillStyle = "#333333";
     ctx.font = `${contentFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
     for (const line of contentWrapped.lines) {
@@ -387,7 +398,6 @@ export default function PosterPage() {
       }
     }
 
-    // Step 6: 图片区
     if (hasLeft || hasRight) {
       drawY += contentImageGap;
       const imgAreaW = boardW - BOARD_PADDING_X * 2;
@@ -395,28 +405,23 @@ export default function PosterPage() {
 
       if (hasLeft && hasRight) {
         const imgH = imageMaxHeight;
-
-        // ---- 右侧圆形手写稿参数 ----
-        const circleDiameter = 340;  // 更大的圆形直径
-        const circleBorder = 8;     // 红色描边粗度
+        const circleDiameter = 340;
+        const circleBorder = 8;
         const circleRadius = circleDiameter / 2;
-        // 圆心向右偏移，让圆形右侧超出白板边缘（产生裁切效果）
-        const circleOverflow = 80;   // 超出白板右边缘的距离
+        const circleOverflow = 80;
         const circleCX = boardX + boardW - circleRadius + circleOverflow;
-        const circleCY = drawY + imgH / 2; // 垂直居中
+        const circleCY = drawY + imgH / 2;
 
-        // 左侧插图宽度：留出圆形在白板内的可见部分
         const gap = 16;
-        const circleVisibleW = circleDiameter - circleOverflow; // 圆形在白板内可见宽度
+        const circleVisibleW = circleDiameter - circleOverflow;
         const leftW = imgAreaW - circleVisibleW - gap + BOARD_PADDING_X;
 
-        // ---- 左侧插图（圆角矩形） ----
         if (images["left"]) {
           ctx.save();
           drawRoundRect(ctx, imgAreaX, drawY, leftW, imgH, 12);
           ctx.clip();
           const lImg = images["left"];
-          const s = Math.max(leftW / lImg.width, imgH / lImg.height) * 0.85; // 缩小15%
+          const s = Math.max(leftW / lImg.width, imgH / lImg.height) * 0.85;
           ctx.drawImage(lImg,
             imgAreaX + (leftW - lImg.width * s) / 2,
             drawY + (imgH - lImg.height * s) / 2,
@@ -425,23 +430,18 @@ export default function PosterPage() {
           ctx.restore();
         }
 
-        // ---- 右侧手写稿（大圆形 + 超出白板右侧裁切效果） ----
         if (images["right"]) {
           const rImg = images["right"];
-
-          // 红色圆形描边（无阴影）
           ctx.beginPath();
           ctx.arc(circleCX, circleCY, circleRadius, 0, Math.PI * 2);
           ctx.fillStyle = THEME_COLOR;
           ctx.fill();
 
-          // 白色内衬圆
           ctx.beginPath();
           ctx.arc(circleCX, circleCY, circleRadius - circleBorder, 0, Math.PI * 2);
           ctx.fillStyle = "#FFFFFF";
           ctx.fill();
 
-          // 圆形裁切绘制图片
           const clipR = circleRadius - circleBorder - 2;
           ctx.save();
           ctx.beginPath();
@@ -477,13 +477,10 @@ export default function PosterPage() {
           ctx.stroke();
         }
       }
-
       drawY += imageMaxHeight + contentImageGap;
     }
 
-    // Step 7: 评语区
     drawY += imageCommentGap;
-
     ctx.fillStyle = "#111111";
     ctx.font = `bold ${commentTitleFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
     for (const line of commentTitleWrapped.lines) {
@@ -493,13 +490,12 @@ export default function PosterPage() {
     drawY += commentGap;
 
     ctx.fillStyle = "#333333";
-    ctx.font = `${commentFontSize}px "SimSun","STSong","Songti SC",serif`;
+    ctx.font = `${commentFontSize}px "FangSong","STFangsong","仿宋",serif`;
     for (const line of commentWrapped.lines) {
       ctx.fillText(line, drawX, drawY);
       drawY += commentLineHeight;
     }
 
-    // Step 8: 底部
     const footerY = boardY + boardH + boardFooterGap;
     const qrSize = 110;
     const qrX = PADDING_X + 10;
@@ -525,7 +521,6 @@ export default function PosterPage() {
     const qrBottom = qrY + qrSize;
     ctx.fillStyle = "#FFFFFF";
     ctx.textBaseline = "bottom";
-    // 联系信息：按换行拆分，逐行绘制，从二维码底部向上排列
     ctx.font = `22px "PingFang SC","Microsoft YaHei",sans-serif`;
     const contactLines = posterData.phone.split("\n").filter(Boolean);
     const lineH = 32;
@@ -534,11 +529,350 @@ export default function PosterPage() {
       ctx.fillText(contactLines[i], textRightX, offsetY);
     }
 
+    // ====================================================================
+    // 简约留白模板 (minimalist)
+    // ====================================================================
+    } else {
+
+    const M_OUTER_PAD = 20;       // 外层浅灰与白板的边距
+    const M_CARD_RADIUS = 16;     // 白色卡片圆角
+    const M_INNER_PAD_X = 40;     // 白板内左右内边距
+    const M_INNER_PAD_TOP = 36;   // 白板内顶部内边距
+    const M_TEXT_WIDTH = POSTER_WIDTH - M_OUTER_PAD * 2 - M_INNER_PAD_X * 2;
+
+    // -- 预计算各文本区块高度 --
+    const mTitleFontSize = 40;
+    const mTitleLineHeight = 56;
+    const mContentFontSize = 26;
+    const mContentLineHeight = 44;
+    const mCommentTitleFontSize = 27;
+    const mCommentTitleLineHeight = 41;
+    const mCommentFontSize = 23;
+    const mCommentLineHeight = 39;
+
+    offCtx.font = `bold ${mTitleFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    const mTitleWrapped = wrapText(offCtx, posterData.mainTitle, M_TEXT_WIDTH, mTitleLineHeight);
+
+    offCtx.font = `${mContentFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    const mContentWrapped = wrapText(offCtx, posterData.content, M_TEXT_WIDTH, mContentLineHeight);
+
+    offCtx.font = `bold ${mCommentTitleFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    const mCommentTitleWrapped = wrapText(offCtx, posterData.teacherName, M_TEXT_WIDTH, mCommentTitleLineHeight);
+
+    offCtx.font = `${mCommentFontSize}px "FangSong","STFangsong","仿宋",serif`;
+    const mCommentWrapped = wrapText(offCtx, posterData.teacherComment, M_TEXT_WIDTH, mCommentLineHeight);
+
+    // -- 头部信息区高度（Logo + 标签 + 三行信息）--
+    const mLogoH = 100;             // Logo 高度
+    const mLogoBottomGap = 16;      // Logo 与标签间距
+    const mHeaderTagH = 36;          // 胶囊标签高度
+    const mHeaderTagBottom = 16;     // 标签与信息间距
+    const mInfoLineH = 40;
+    const mHeaderInfoH = mInfoLineH * 3;
+    const mHeaderBottomGap = 24;     // 头部与主标题间距
+    const mHeaderTotalH = M_INNER_PAD_TOP + mLogoH + mLogoBottomGap + mHeaderTagH + mHeaderTagBottom + mHeaderInfoH + mHeaderBottomGap;
+
+    // -- 正文区 --
+    const mTitleContentGap = 20;
+    const mContentImageGap = 24;
+    let mImageAreaHeight = 0;
+    if (hasLeft || hasRight) {
+      mImageAreaHeight = imageMaxHeight + mContentImageGap * 2;
+    }
+
+    // -- 评语区 --
+    const mImageCommentGap = (hasLeft || hasRight) ? 12 : 20;
+    const mCommentGap = 8;
+
+    // -- 分隔线 --
+    const mDividerGap = 16;
+
+    // -- 底部信息区 --
+    const mFooterHeight = 110;
+    const mFooterTopGap = 12;
+
+    // -- 白板总高度 --
+    const mCardH =
+      mHeaderTotalH +
+      mTitleWrapped.height + mTitleContentGap +
+      mContentWrapped.height +
+      mImageAreaHeight +
+      mImageCommentGap +
+      mDividerGap * 2 + 2 +
+      mCommentTitleWrapped.height + mCommentGap +
+      mCommentWrapped.height +
+      mFooterTopGap +
+      mDividerGap * 2 + 2 +
+      mFooterHeight +
+      16;
+
+    const mTotalHeight = M_OUTER_PAD * 2 + mCardH;
+
+    canvas.width = POSTER_WIDTH * dpr;
+    canvas.height = mTotalHeight * dpr;
+    const viewportH = window.innerHeight;
+    const availableH = viewportH - 140;
+    const scale = Math.min(1, availableH / mTotalHeight);
+    canvas.style.width = `${POSTER_WIDTH * scale}px`;
+    canvas.style.height = `${mTotalHeight * scale}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Step 1: 浅灰背景
+    ctx.fillStyle = "#F5F5F5";
+    ctx.fillRect(0, 0, POSTER_WIDTH, mTotalHeight);
+
+    // Step 2: 白色圆角卡片底板
+    const cardX = M_OUTER_PAD;
+    const cardY = M_OUTER_PAD;
+    const cardW = POSTER_WIDTH - M_OUTER_PAD * 2;
+    ctx.fillStyle = "#FFFFFF";
+    drawRoundRect(ctx, cardX, cardY, cardW, mCardH, M_CARD_RADIUS);
+    ctx.fill();
+
+    let drawY = cardY + M_INNER_PAD_TOP;
+    const drawX = cardX + M_INNER_PAD_X;
+    const drawRight = cardX + cardW - M_INNER_PAD_X;
+    ctx.textBaseline = "top";
+
+    // Step 3: 头部信息区
+    // 右上角 Logo（简约模板使用 logo01.png，尺寸与经典模板一致）
+    const logoH = 100;
+    const logoW = 260;
+    if (images["logo01"]) {
+      const logoImg = images["logo01"];
+      ctx.drawImage(logoImg, drawRight - logoW, drawY - 8, logoW, logoH);
+    }
+
+    // Logo 下方留间距后再绘制标签和信息
+    drawY += logoH + 16;
+
+    // 粉红胶囊标签"习作分享"
+    const tagText = "习作分享";
+    const tagFontSize = 20;
+    const tagPadX = 20;
+    const tagH = mHeaderTagH;
+    ctx.font = `bold ${tagFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    const tagTextW = ctx.measureText(tagText).width;
+    const tagW = tagTextW + tagPadX * 2;
+    const tagRadius = tagH / 2;
+
+    ctx.fillStyle = "#FF7A84";
+    drawRoundRect(ctx, drawX, drawY, tagW, tagH, tagRadius);
+    ctx.fill();
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.textAlign = "left";
+    ctx.fillText(tagText, drawX + tagPadX, drawY + (tagH - tagFontSize) / 2);
+
+    drawY += tagH + mHeaderTagBottom;
+
+    // 左侧三行信息（标签加粗，内容正常字重）
+    const mLabelFontSize = 25;
+    ctx.fillStyle = "#333333";
+
+    const drawMInfoLine = (label: string, value: string, x: number, y: number, fontSize: number) => {
+      ctx.font = `bold ${fontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.fillStyle = "#333333";
+      ctx.fillText(label, x, y);
+      const labelW = ctx.measureText(label).width;
+      ctx.font = `${fontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.fillText(value, x + labelW, y);
+    };
+
+    drawMInfoLine("\u9986\u3000\u540d\uff1a", posterData.readingRoom, drawX, drawY, mLabelFontSize);
+    drawY += mInfoLineH;
+    drawMInfoLine("\u5b66\u3000\u5458\uff1a", posterData.studentInfo, drawX, drawY, mLabelFontSize);
+    drawY += mInfoLineH;
+    if (posterData.bookTitle.trim()) {
+      drawMInfoLine("\u4e66\u3000\u76ee\uff1a", posterData.bookTitle, drawX, drawY, mLabelFontSize);
+    } else {
+      ctx.font = `bold 32px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.fillStyle = "#333333";
+      ctx.fillText(`\u770b\u56fe\u5199\u8bdd`, drawX, drawY);
+    }
+    drawY += mInfoLineH + mHeaderBottomGap;
+
+    // Step 4: 主标题（居中，粉红色，大号加粗）
+    ctx.fillStyle = "#FF7A84";
+    ctx.font = `bold ${mTitleFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    ctx.textAlign = "center";
+    for (const line of mTitleWrapped.lines) {
+      ctx.fillText(line, POSTER_WIDTH / 2, drawY);
+      drawY += mTitleLineHeight;
+    }
+    ctx.textAlign = "left";
+    drawY += mTitleContentGap;
+
+    // Step 5: 正文（深灰色，左对齐）
+    ctx.fillStyle = "#555555";
+    ctx.font = `${mContentFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    for (const line of mContentWrapped.lines) {
+      if (line === "") {
+        drawY += mContentLineHeight * 0.4;
+      } else {
+        ctx.fillText(line, drawX, drawY);
+        drawY += mContentLineHeight;
+      }
+    }
+
+    // Step 6: 图片区（尺寸与经典模板保持一致）
+    if (hasLeft || hasRight) {
+      drawY += mContentImageGap;
+      // 使用与经典模板相同的图片区宽度参数
+      const classicBoardW = POSTER_WIDTH - PADDING_X * 2;
+      const imgAreaW = classicBoardW - BOARD_PADDING_X * 2;
+      const imgAreaX = drawX;
+
+      if (hasLeft && hasRight) {
+        const imgH = imageMaxHeight;
+        const circleDiameter = 340;
+        const circleBorder = 8;
+        const circleRadius = circleDiameter / 2;
+        const circleOverflow = 80;
+        const circleCX = cardX + cardW - circleRadius + circleOverflow;
+        const circleCY = drawY + imgH / 2;
+
+        const gap = 16;
+        const circleVisibleW = circleDiameter - circleOverflow;
+        const leftW = imgAreaW - circleVisibleW - gap + BOARD_PADDING_X;
+
+        if (images["left"]) {
+          ctx.save();
+          drawRoundRect(ctx, imgAreaX, drawY, leftW, imgH, 12);
+          ctx.clip();
+          const lImg = images["left"];
+          const s = Math.max(leftW / lImg.width, imgH / lImg.height) * 0.85;
+          ctx.drawImage(lImg,
+            imgAreaX + (leftW - lImg.width * s) / 2,
+            drawY + (imgH - lImg.height * s) / 2,
+            lImg.width * s, lImg.height * s
+          );
+          ctx.restore();
+        }
+
+        if (images["right"]) {
+          const rImg = images["right"];
+          ctx.beginPath();
+          ctx.arc(circleCX, circleCY, circleRadius, 0, Math.PI * 2);
+          ctx.fillStyle = "#CCCCCC";
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(circleCX, circleCY, circleRadius - circleBorder, 0, Math.PI * 2);
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fill();
+
+          const clipR = circleRadius - circleBorder - 2;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(circleCX, circleCY, clipR, 0, Math.PI * 2);
+          ctx.clip();
+          const rs = Math.max((clipR * 2) / rImg.width, (clipR * 2) / rImg.height);
+          ctx.drawImage(rImg,
+            circleCX - (rImg.width * rs) / 2,
+            circleCY - (rImg.height * rs) / 2,
+            rImg.width * rs, rImg.height * rs
+          );
+          ctx.restore();
+        }
+      } else {
+        const singleImg = images["left"] || images["right"];
+        if (singleImg) {
+          const maxW = imgAreaW * 0.65;
+          const imgH = imageMaxHeight;
+          const s = Math.min(maxW / singleImg.width, imgH / singleImg.height);
+          const dw = singleImg.width * s;
+          const dh = singleImg.height * s;
+          const cx = imgAreaX + (imgAreaW - dw) / 2;
+
+          ctx.save();
+          drawRoundRect(ctx, cx, drawY, dw, dh, 12);
+          ctx.clip();
+          ctx.drawImage(singleImg, cx, drawY, dw, dh);
+          ctx.restore();
+
+          ctx.strokeStyle = "#eee";
+          ctx.lineWidth = 2;
+          drawRoundRect(ctx, cx, drawY, dw, dh, 12);
+          ctx.stroke();
+        }
+      }
+      drawY += imageMaxHeight + mContentImageGap;
+    }
+
+    // Step 7: 分隔线 + 评语区
+    drawY += mImageCommentGap;
+    ctx.strokeStyle = "#E8E8E8";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(drawX, drawY);
+    ctx.lineTo(drawRight, drawY);
+    ctx.stroke();
+    drawY += mDividerGap;
+
+    // 评语标题加粗 + 红色下划点缀
+    ctx.fillStyle = "#333333";
+    ctx.font = `bold ${mCommentTitleFontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    for (const line of mCommentTitleWrapped.lines) {
+      ctx.fillText(line, drawX, drawY);
+      drawY += mCommentTitleLineHeight;
+    }
+    drawY += mCommentGap;
+
+    // 评语正文
+    ctx.fillStyle = "#555555";
+    ctx.font = `${mCommentFontSize}px "FangSong","STFangsong","仿宋",serif`;
+    for (const line of mCommentWrapped.lines) {
+      ctx.fillText(line, drawX, drawY);
+      drawY += mCommentLineHeight;
+    }
+
+    // Step 8: 分隔线 + 底部信息区
+    drawY += mFooterTopGap;
+    ctx.strokeStyle = "#E8E8E8";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(drawX, drawY);
+    ctx.lineTo(drawRight, drawY);
+    ctx.stroke();
+    drawY += mDividerGap;
+
+    const qrSize = 100;
+    const qrX = drawX;
+    const qrY = drawY;
+
+    if (images["qr"]) {
+      ctx.drawImage(images["qr"], qrX, qrY, qrSize, qrSize);
+    } else {
+      ctx.fillStyle = "#F0F0F0";
+      drawRoundRect(ctx, qrX, qrY, qrSize, qrSize, 8);
+      ctx.fill();
+      ctx.fillStyle = "#bbb";
+      ctx.font = `14px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("二维码", qrX + qrSize / 2, qrY + qrSize / 2 + 4);
+      ctx.textAlign = "left";
+    }
+
+    const textRightX = qrX + qrSize + 24;
+    const qrBottom = qrY + qrSize;
+    ctx.fillStyle = "#333333";
+    ctx.textBaseline = "bottom";
+    ctx.font = `22px "PingFang SC","Microsoft YaHei",sans-serif`;
+    const contactLines = posterData.phone.split("\n").filter(Boolean);
+    const lineH = 32;
+    for (let i = contactLines.length - 1; i >= 0; i--) {
+      const offsetY = qrBottom - (contactLines.length - 1 - i) * lineH;
+      ctx.fillText(contactLines[i], textRightX, offsetY);
+    }
+
+    } // end of minimalist template
+
     } catch (err) {
       console.error("海报绘制出错：", err);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posterData, wrapText]);
+  }, [posterData, wrapText, templateStyle]);
 
   useEffect(() => {
     drawPoster();
@@ -649,6 +983,36 @@ export default function PosterPage() {
       console.warn("读取历史记录失败");
     }
   }, []);
+
+  /** 加载图库数据（首次打开图库弹窗时触发） */
+  const loadGallery = useCallback(async () => {
+    if (galleryLoaded) return;
+    try {
+      const res = await fetch("/api/gallery");
+      if (res.ok) {
+        const data: GalleryCategory[] = await res.json();
+        setGalleryCategories(data);
+        // 设置默认选中项
+        if (data.length > 0) {
+          setGalleryTab((prev) => prev || data[0].id);
+          const firstGrade = data[0].grades?.[0];
+          if (firstGrade) {
+            setGalleryGrade((prev) => prev || firstGrade.id);
+            setGalleryBook((prev) => prev || firstGrade.books?.[0]?.id || "");
+          }
+        }
+      }
+    } catch {
+      console.warn("图库数据加载失败");
+    } finally {
+      setGalleryLoaded(true);
+    }
+  }, [galleryLoaded]);
+
+  // 图库弹窗打开时自动加载数据
+  useEffect(() => {
+    if (galleryOpen) loadGallery();
+  }, [galleryOpen, loadGallery]);
 
   /** 保存历史记录到 localStorage */
   const saveHistoryToStorage = useCallback((items: HistoryItem[]) => {
@@ -867,7 +1231,7 @@ export default function PosterPage() {
 
           {/* 一级分类 Tab 导航 */}
           <div className="flex gap-1.5 border-b border-gray-100 pb-2">
-            {GALLERY_CATEGORIES.map(cat => (
+            {galleryCategories.map(cat => (
               <button
                 key={cat.id}
                 className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
@@ -893,7 +1257,7 @@ export default function PosterPage() {
 
           {/* 课程书目：二级年级 Tab + 三级书名下拉 */}
           {(() => {
-            const activeCat = GALLERY_CATEGORIES.find(c => c.id === galleryTab);
+            const activeCat = galleryCategories.find(c => c.id === galleryTab);
             if (!activeCat?.grades || activeCat.grades.length === 0) return null;
 
             const activeGrade = activeCat.grades.find(g => g.id === galleryGrade);
@@ -921,19 +1285,26 @@ export default function PosterPage() {
                   ))}
                 </div>
 
-                {/* 书名下拉选择（每年级 20-40 本书，用下拉更合适） */}
+                {/* 书名可滚动列表 */}
                 {activeGrade && activeGrade.books.length > 0 && (
-                  <select
-                    value={galleryBook}
-                    onChange={e => setGalleryBook(e.target.value)}
-                    className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#ff7670] focus:border-[#ff7670] cursor-pointer"
-                  >
+                  <div className="max-h-[132px] overflow-y-auto border border-gray-200 rounded-lg bg-gray-50/50">
                     {activeGrade.books.map(book => (
-                      <option key={book.id} value={book.id}>
-                        {book.label}（{book.images.length} 张）
-                      </option>
+                      <button
+                        key={book.id}
+                        className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors border-b border-gray-100 last:border-b-0 cursor-pointer ${
+                          galleryBook === book.id
+                            ? "bg-[#ff7670]/10 text-[#ff7670] font-medium"
+                            : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                        onClick={() => setGalleryBook(book.id)}
+                      >
+                        <span className="truncate">{book.label}</span>
+                        <span className={`shrink-0 ml-2 text-[10px] ${galleryBook === book.id ? "text-[#ff7670]/60" : "text-gray-400"}`}>
+                          {book.images.length} 张
+                        </span>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 )}
 
                 {/* 该年级无书目提示 */}
@@ -947,7 +1318,7 @@ export default function PosterPage() {
           {/* 图片网格 */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {(() => {
-              const activeCat = GALLERY_CATEGORIES.find(c => c.id === galleryTab);
+              const activeCat = galleryCategories.find(c => c.id === galleryTab);
 
               // 根据分类类型获取当前图片列表
               let currentImages: { src: string; name: string }[] = [];
@@ -999,7 +1370,7 @@ export default function PosterPage() {
 
           {/* 底部提示 */}
           <div className="text-[10px] text-gray-400 text-center pt-2 border-t border-gray-100">
-            图片目录：public/gallery/分类/年级/书名/ · 配置文件：app/gallery-data.ts
+            图片目录：public/gallery/分类/年级/书名/ · 放入图片后自动识别
           </div>
         </DialogContent>
       </Dialog>
@@ -1108,19 +1479,182 @@ export default function PosterPage() {
         </DialogContent>
       </Dialog>
 
+      {/* ========== 使用指南弹窗 ========== */}
+      <Dialog open={guideOpen} onOpenChange={setGuideOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <svg className="w-5 h-5 text-[#ff7670]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              使用说明
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-400">
+              老约翰深度阅读 · 学员习作展示海报生成器
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-5 pr-1 leading-relaxed">
+
+            {/* 简介 */}
+            <p className="text-gray-500 text-sm bg-gray-50 rounded-lg px-4 py-3 leading-relaxed">
+              本工具帮助老师告别繁琐 P 图排版，只需输入文字和图片，即可一键生成排版精美、高清的展示海报，支持下载直接发给家长或发朋友圈。
+            </p>
+
+            {/* 步骤列表 */}
+            {[
+              {
+                step: "01", title: "选择模板风格",
+                content: (
+                  <div className="space-y-2">
+                    <p>在左侧面板顶部切换两款模板：</p>
+                    <div className="flex gap-2 flex-wrap items-center">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#ff7670] text-white text-sm rounded-full font-medium">品牌橙红</span>
+                      <span className="text-sm text-gray-500">品牌色背景，适合大部分低年级作品</span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap items-center">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 border border-[#ff7670] text-[#ff7670] text-sm rounded-full font-medium">简约留白</span>
+                      <span className="text-sm text-gray-500">极简留白风格，适合高年级或文字较多的长篇习作</span>
+                    </div>
+                  </div>
+                )
+              },
+              {
+                step: "02", title: "填写头部信息",
+                content: <p>在"头部信息"区依次填入<strong>馆名、学员信息、课程书目</strong>。看图写话类习作可将书目留空，海报将自动显示"看图写话"。</p>
+              },
+              {
+                step: "03", title: "录入习作正文",
+                content: (
+                  <div className="space-y-2">
+                    <p><strong>手动输入：</strong>直接在文本框打字，工具原样保留换行排版。</p>
+                    <p><strong className="text-[#314F80]">✨ 手写稿识别（强烈推荐）：</strong>点击 <span className="bg-[#314F80] text-white text-xs px-1.5 py-0.5 rounded">手写稿识别</span> 按钮，上传孩子的手写稿照片（最多 5 张），系统自动识别文字，在弹窗核对微调后一键填入，大幅节省打字时间。</p>
+                  </div>
+                )
+              },
+              {
+                step: "04", title: "配置展示图片",
+                content: (
+                  <div className="space-y-2">
+                    <p><strong>左侧插图：</strong>点击 <span className="bg-gray-100 text-gray-700 text-xs px-1.5 py-0.5 rounded">内置图库</span> 从预设插图中挑选，或点击 <span className="bg-gray-100 text-gray-700 text-xs px-1.5 py-0.5 rounded">本地上传</span> 使用自备配图，上传后可进入裁切编辑器调整构图。</p>
+                    <p><strong>右侧手写稿：</strong>上传孩子的手写原稿，系统自动裁切为<strong>正圆形</strong>展示在海报右侧，无需提前修图。</p>
+                    <p className="text-gray-400">💡 只传一张图时，系统自动将该图居中展示。</p>
+                  </div>
+                )
+              },
+              {
+                step: "05", title: "撰写老师评语",
+                content: (
+                  <div className="space-y-2">
+                    <p><strong className="text-[#314F80]">✨ 智能生成：</strong>填好学员信息和习作正文后，点击 <span className="bg-[#314F80] text-white text-xs px-1.5 py-0.5 rounded">智能生成</span>，系统自动生成一段专业评语，生成后可在文本框中个性化修改。</p>
+                    <p><strong>手动输入：</strong>直接在评语文本框填写，并在署名栏注明老师姓名。</p>
+                  </div>
+                )
+              },
+              {
+                step: "06", title: "底部信息与二维码",
+                content: <p>上传馆区专属的客服活码二维码，并在联系信息栏填写电话号码或引导文案（支持换行）。</p>
+              },
+              {
+                step: "07", title: "预览与下载",
+                content: <p>左侧任何填写内容都会在右侧<strong>实时预览</strong>。确认排版无误后，点击 <span className="bg-[#ff7670] text-white text-xs px-1.5 py-0.5 rounded">下载海报</span> 保存高清 PNG 图片，同时自动保存到底部<strong>生成历史</strong>，可随时回溯加载。</p>
+              },
+            ].map(({ step, title, content }) => (
+              <div key={step} className="flex gap-4">
+                <span className="shrink-0 w-8 h-8 rounded-full bg-[#ff7670]/10 text-[#ff7670] text-sm font-bold flex items-center justify-center mt-0.5">{step}</span>
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800 text-base mb-1.5">{title}</div>
+                  <div className="text-gray-500 text-sm leading-relaxed">{content}</div>
+                </div>
+              </div>
+            ))}
+
+            {/* 小贴士 */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+              <div className="text-sm font-semibold text-amber-700 flex items-center gap-1.5">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/><line x1="10" y1="21" x2="14" y2="21"/></svg>
+                老师们的高效小贴士
+              </div>
+              <p className="text-sm text-amber-700"><strong>文字太多？</strong>画布高度全自动适应，正文再长底板也会自动拉伸，不用担心文字被截断。</p>
+              <p className="text-sm text-amber-700"><strong>手写稿方向不对？</strong>上传前请确保图片方向正向，裁切效果最佳。</p>
+              <p className="text-sm text-amber-700"><strong>数据安全：</strong>海报在浏览器本地生成，不依赖外部服务器（智能识别除外），孩子作品隐私有保障。</p>
+            </div>
+
+          </div>
+
+          <DialogFooter>
+            <Button className="bg-[#ff7670] hover:bg-[#e5635d] text-white px-8" onClick={() => setGuideOpen(false)}>
+              知道了，开始生成
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 页面标题 */}
-      <div className="max-w-[1400px] mx-auto mb-5">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <img src="/logo-1.png" alt="老约翰" className="w-10 h-10 object-contain" />
-          深度阅读学员习作展示海报生成器
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">填写左侧表单，右侧实时预览海报，点击下载保存高清图片</p>
+      <div className="max-w-[1400px] mx-auto mb-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <img src="/logo-1.png" alt="老约翰" className="w-10 h-10 object-contain" />
+            深度阅读学员习作展示海报生成器
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">填写左侧表单，右侧实时预览海报，点击下载保存高清图片</p>
+        </div>
+        <button
+          onClick={() => setGuideOpen(true)}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 text-gray-600 text-sm hover:bg-gray-100 transition-colors shrink-0"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          使用说明
+        </button>
       </div>
 
       {/* 左右两栏 */}
       <div className="max-w-[1400px] mx-auto grid grid-cols-[520px_1fr] gap-6 items-start">
         {/* ========== 左侧配置面板 ========== */}
         <div className="space-y-3 max-h-[calc(100vh-130px)] overflow-y-auto pr-2">
+          {/* 模板样式切换 */}
+          <Card>
+            <CardContent className="py-3 px-4">
+              <Label className="text-xs text-gray-500 mb-2 block">模板样式</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {/* 经典粉红：选中时品牌橙红色实底 */}
+                <button
+                  className={`relative flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 transition-all cursor-pointer ${
+                    templateStyle === 'classic'
+                      ? 'border-[#ff7670] bg-[#ff7670] shadow-sm'
+                      : 'border-gray-200 bg-white hover:border-[#ff7670]/50'
+                  }`}
+                  onClick={() => setTemplateStyle('classic')}
+                >
+                  <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    templateStyle === 'classic' ? 'border-white' : 'border-gray-300'
+                  }`}>
+                    {templateStyle === 'classic' && <span className="w-2 h-2 rounded-full bg-white" />}
+                  </span>
+                  <span className={`text-xs font-medium ${templateStyle === 'classic' ? 'text-white' : 'text-gray-700'}`}>品牌橙红</span>
+                </button>
+                {/* 简约留白：选中时白底+边框 */}
+                <button
+                  className={`relative flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 transition-all cursor-pointer ${
+                    templateStyle === 'minimalist'
+                      ? 'border-[#ff7670] bg-white shadow-sm'
+                      : 'border-gray-200 bg-white hover:border-[#ff7670]/50'
+                  }`}
+                  onClick={() => setTemplateStyle('minimalist')}
+                >
+                  <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    templateStyle === 'minimalist' ? 'border-[#ff7670]' : 'border-gray-300'
+                  }`}>
+                    {templateStyle === 'minimalist' && <span className="w-2 h-2 rounded-full bg-[#ff7670]" />}
+                  </span>
+                  <span className={`text-xs font-medium ${templateStyle === 'minimalist' ? 'text-[#ff7670]' : 'text-gray-700'}`}>简约留白</span>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* 头部信息 */}
           <Card>
             <CardHeader className="pb-2 pt-4">
@@ -1231,14 +1765,7 @@ export default function PosterPage() {
                       </button>
                       <button
                         className="flex items-center justify-center gap-1 py-1.5 rounded-md border border-[#ff7670]/50 bg-white hover:bg-[#fff5f5] transition-colors text-xs text-[#ff7670] cursor-pointer"
-                        onClick={() => {
-                          const first = GALLERY_CATEGORIES[0];
-                          setGalleryTab(first?.id || "");
-                          const firstGrade = first?.grades?.[0];
-                          setGalleryGrade(firstGrade?.id || "");
-                          setGalleryBook(firstGrade?.books?.[0]?.id || "");
-                          setGalleryOpen(true);
-                        }}
+                        onClick={() => setGalleryOpen(true)}
                         title="从图库选择"
                       >
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
@@ -1260,14 +1787,7 @@ export default function PosterPage() {
                     {/* 从图库选择 */}
                     <button
                       className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-lg border-2 border-dashed border-[#ff7670]/40 bg-[#fff5f5]/50 hover:border-[#ff7670] hover:bg-[#fff5f5] transition-colors cursor-pointer group"
-                      onClick={() => {
-                        const first = GALLERY_CATEGORIES[0];
-                        setGalleryTab(first?.id || "");
-                        const firstGrade = first?.grades?.[0];
-                        setGalleryGrade(firstGrade?.id || "");
-                        setGalleryBook(firstGrade?.books?.[0]?.id || "");
-                        setGalleryOpen(true);
-                      }}
+                      onClick={() => setGalleryOpen(true)}
                     >
                       <svg className="w-6 h-6 text-[#ff7670]/60 group-hover:text-[#ff7670] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
                       <span className="text-xs text-[#ff7670]/70 group-hover:text-[#ff7670] font-medium">从图库选择</span>

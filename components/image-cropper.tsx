@@ -123,8 +123,8 @@ export default function ImageCropper({
     const ctx = canvas.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // 深色背景
-    ctx.fillStyle = "#1a1a2e";
+    // 黑色背景
+    ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, viewW, viewH);
 
     // 绘制图片
@@ -144,12 +144,12 @@ export default function ImageCropper({
     ctx.fillRect(cropX + cropW, cropY, viewW - cropX - cropW, cropH);
 
     // 裁切框边框
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.strokeStyle = "rgba(255,118,112,0.8)";
     ctx.lineWidth = 2;
     ctx.strokeRect(cropX, cropY, cropW, cropH);
 
     // 九宫格辅助线
-    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.strokeStyle = "rgba(255,118,112,0.25)";
     ctx.lineWidth = 1;
     for (let i = 1; i <= 2; i++) {
       // 水平线
@@ -250,19 +250,19 @@ export default function ImageCropper({
   // ============================================================
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-[#1a1a2e] rounded-2xl shadow-2xl flex flex-col max-w-[860px] w-[95vw] max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl flex flex-col max-w-[860px] w-[95vw] max-h-[90vh] overflow-hidden">
         {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <h3 className="text-white text-base font-semibold flex items-center gap-2">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="text-gray-800 text-base font-semibold flex items-center gap-2">
+            <svg className="w-5 h-5 text-[#ff7670]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
               <line x1="3" y1="6" x2="21" y2="6" />
               <path d="M16 10a4 4 0 0 1-8 0" />
             </svg>
             裁切图片
           </h3>
-          <button onClick={onCancel} className="text-white/50 hover:text-white transition">
+          <button onClick={onCancel} className="text-gray-400 hover:text-gray-700 transition">
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -270,7 +270,7 @@ export default function ImageCropper({
         {/* 画布区域 */}
         <div
           ref={containerRef}
-          className="flex-1 flex items-center justify-center p-4 min-h-[400px] select-none"
+          className="flex-1 flex items-center justify-center p-4 min-h-[400px] select-none bg-black"
           style={{ cursor: isDragging.current ? "grabbing" : "grab" }}
         >
           {imgLoaded ? (
@@ -284,13 +284,13 @@ export default function ImageCropper({
               style={{ touchAction: "none" }}
             />
           ) : (
-            <p className="text-white/50">加载中...</p>
+            <p className="text-gray-400">加载中...</p>
           )}
         </div>
 
         {/* 缩放滑块 */}
-        <div className="flex items-center gap-3 px-6 py-3 border-t border-white/10">
-          <span className="text-white/60 text-sm flex items-center gap-1">
+        <div className="flex items-center gap-3 px-6 py-3 border-t border-gray-100">
+          <span className="text-gray-500 text-sm flex items-center gap-1">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
@@ -303,20 +303,20 @@ export default function ImageCropper({
             max={maxSlider}
             value={sliderValue}
             onChange={handleSliderChange}
-            className="flex-1 h-1.5 accent-[#ff7670] bg-white/20 rounded-full appearance-none cursor-pointer"
+            className="flex-1 h-1.5 accent-[#ff7670] bg-gray-200 rounded-full appearance-none cursor-pointer"
           />
-          <span className="text-white/60 text-sm w-12 text-right">
+          <span className="text-gray-500 text-sm w-12 text-right">
             {Math.round((scale / initialScaleRef.current) * 100)}%
           </span>
         </div>
 
         {/* 提示 + 操作按钮 */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
-          <p className="text-white/40 text-xs">拖动图片调整位置，滚动鼠标滚轮或使用滑块调整缩放</p>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+          <p className="text-gray-400 text-xs">拖动图片调整位置，滚动鼠标滚轮或使用滑块调整缩放</p>
           <div className="flex gap-3">
             <button
               onClick={onCancel}
-              className="px-6 py-2 rounded-lg border border-white/20 text-white/70 hover:bg-white/10 transition text-sm"
+              className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition text-sm"
             >
               取消
             </button>
