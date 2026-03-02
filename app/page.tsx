@@ -91,7 +91,7 @@ export default function PosterPage() {
     imageRight: "/pict01.png",
     teacherName: "老师评语：（老约翰阅读馆 萱萱老师）",
     teacherComment:
-      "俊瑞，你真是一位想象力丰富又勇敢的探险家！习作不仅有闻气味、辨毒草这些生动的细节，更棒的是写出了自己从害怕到变厉害的心理成长。你的文字充满了力量，让老师也想跟着你去探险了！",
+      "涵语，你真是一位想象力丰富又勇敢的探险家！习作不仅有闻气味、辨毒草这些生动的细节，更棒的是写出了自己从害怕到变厉害的心理成长。你的文字充满了力量，让老师也想跟着你去探险了！",
     qrCode: null,
     phone: "",
     footerText: "",
@@ -984,6 +984,9 @@ export default function PosterPage() {
     }
   }, []);
 
+  // 标记是否已从 localStorage 完成恢复，防止初始化时保存 effect 用默认值覆盖已存数据
+  const prefsRestored = useRef(false);
+
   // 客户端挂载后，从 localStorage 恢复所有文字字段和二维码（图片因体积大不保存）
   useEffect(() => {
     try {
@@ -992,24 +995,28 @@ export default function PosterPage() {
         const p = JSON.parse(saved);
         setPosterData(prev => ({
           ...prev,
-          ...(p.readingRoom   ? { readingRoom:   p.readingRoom   } : {}),
-          ...(p.studentInfo   ? { studentInfo:   p.studentInfo   } : {}),
-          ...(p.bookTitle     ? { bookTitle:     p.bookTitle     } : {}),
-          ...(p.mainTitle     ? { mainTitle:     p.mainTitle     } : {}),
-          ...(p.content       ? { content:       p.content       } : {}),
-          ...(p.teacherName   ? { teacherName:   p.teacherName   } : {}),
-          ...(p.teacherComment? { teacherComment:p.teacherComment} : {}),
-          ...(p.phone   !== undefined ? { phone:      p.phone      } : {}),
+          ...(p.readingRoom    ? { readingRoom:    p.readingRoom    } : {}),
+          ...(p.studentInfo    ? { studentInfo:    p.studentInfo    } : {}),
+          ...(p.bookTitle      ? { bookTitle:      p.bookTitle      } : {}),
+          ...(p.mainTitle      ? { mainTitle:      p.mainTitle      } : {}),
+          ...(p.content        ? { content:        p.content        } : {}),
+          ...(p.teacherName    ? { teacherName:    p.teacherName    } : {}),
+          ...(p.teacherComment ? { teacherComment: p.teacherComment } : {}),
+          ...(p.phone      !== undefined ? { phone:      p.phone      } : {}),
           ...(p.footerText !== undefined ? { footerText: p.footerText } : {}),
           // 只恢复用户上传的 base64，过滤掉旧版存入的默认占位路径
           ...(p.qrCode && p.qrCode.startsWith("data:") ? { qrCode: p.qrCode } : {}),
         }));
       }
     } catch { /* 读取失败时静默使用默认值 */ }
+    // 恢复完成，允许保存 effect 执行
+    prefsRestored.current = true;
   }, []);
 
   // 所有文字字段或二维码变化时，自动保存到 localStorage（图片不保存，体积过大）
+  // 必须等 prefsRestored 完成后才保存，避免用默认值覆盖已存数据
   useEffect(() => {
+    if (!prefsRestored.current) return;
     try {
       localStorage.setItem("poster_prefs", JSON.stringify({
         readingRoom:    posterData.readingRoom,
