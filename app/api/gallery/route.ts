@@ -14,23 +14,23 @@ import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
 
-// 内存缓存，避免重复读取文件
+// 生产环境内存缓存，避免重复读取文件；开发环境每次读取最新清单
 let cache: unknown = null;
+const isDev = process.env.NODE_ENV === "development";
 
 export async function GET() {
-  if (cache) {
+  if (!isDev && cache) {
     return NextResponse.json(cache);
   }
 
   try {
-    // 读取构建时生成的清单文件
     const manifestPath = path.join(process.cwd(), "public", "gallery-manifest.json");
     const raw = await readFile(manifestPath, "utf-8");
-    cache = JSON.parse(raw);
-    return NextResponse.json(cache);
+    const data = JSON.parse(raw);
+    if (!isDev) cache = data;
+    return NextResponse.json(data);
   } catch (err) {
     console.error("图库清单读取失败：", err);
-    // 降级返回空数组，前端会显示"暂无图片"
     return NextResponse.json([]);
   }
 }
