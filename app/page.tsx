@@ -984,35 +984,52 @@ export default function PosterPage() {
     }
   }, []);
 
-  // 客户端挂载后，从 localStorage 恢复馆名、二维码、联系信息
+  // 客户端挂载后，从 localStorage 恢复所有文字字段和二维码（图片因体积大不保存）
   useEffect(() => {
     try {
       const saved = localStorage.getItem("poster_prefs");
       if (saved) {
-        const prefs = JSON.parse(saved);
+        const p = JSON.parse(saved);
         setPosterData(prev => ({
           ...prev,
-          ...(prefs.readingRoom ? { readingRoom: prefs.readingRoom } : {}),
+          ...(p.readingRoom   ? { readingRoom:   p.readingRoom   } : {}),
+          ...(p.studentInfo   ? { studentInfo:   p.studentInfo   } : {}),
+          ...(p.bookTitle     ? { bookTitle:     p.bookTitle     } : {}),
+          ...(p.mainTitle     ? { mainTitle:     p.mainTitle     } : {}),
+          ...(p.content       ? { content:       p.content       } : {}),
+          ...(p.teacherName   ? { teacherName:   p.teacherName   } : {}),
+          ...(p.teacherComment? { teacherComment:p.teacherComment} : {}),
+          ...(p.phone   !== undefined ? { phone:      p.phone      } : {}),
+          ...(p.footerText !== undefined ? { footerText: p.footerText } : {}),
           // 只恢复用户上传的 base64，过滤掉旧版存入的默认占位路径
-          ...(prefs.qrCode && prefs.qrCode.startsWith("data:") ? { qrCode: prefs.qrCode } : {}),
-          ...(prefs.phone !== undefined ? { phone: prefs.phone } : {}),
-          ...(prefs.footerText !== undefined ? { footerText: prefs.footerText } : {}),
+          ...(p.qrCode && p.qrCode.startsWith("data:") ? { qrCode: p.qrCode } : {}),
         }));
       }
     } catch { /* 读取失败时静默使用默认值 */ }
   }, []);
 
-  // 馆名、二维码、联系信息变化时自动保存到 localStorage
+  // 所有文字字段或二维码变化时，自动保存到 localStorage（图片不保存，体积过大）
   useEffect(() => {
     try {
       localStorage.setItem("poster_prefs", JSON.stringify({
-        readingRoom: posterData.readingRoom,
-        qrCode: posterData.qrCode,
-        phone: posterData.phone,
-        footerText: posterData.footerText,
+        readingRoom:    posterData.readingRoom,
+        studentInfo:    posterData.studentInfo,
+        bookTitle:      posterData.bookTitle,
+        mainTitle:      posterData.mainTitle,
+        content:        posterData.content,
+        teacherName:    posterData.teacherName,
+        teacherComment: posterData.teacherComment,
+        phone:          posterData.phone,
+        footerText:     posterData.footerText,
+        qrCode:         posterData.qrCode,
       }));
     } catch { /* 存储空间不足时静默忽略 */ }
-  }, [posterData.readingRoom, posterData.qrCode, posterData.phone, posterData.footerText]);
+  }, [
+    posterData.readingRoom, posterData.studentInfo, posterData.bookTitle,
+    posterData.mainTitle, posterData.content, posterData.teacherName,
+    posterData.teacherComment, posterData.phone, posterData.footerText,
+    posterData.qrCode,
+  ]);
 
   /** 加载图库数据（首次打开图库弹窗时触发） */
   const loadGallery = useCallback(async () => {
@@ -1585,8 +1602,8 @@ export default function PosterPage() {
                 step: "06", title: "底部信息与二维码",
                 content: (
                   <div className="space-y-2">
-                    <p>上传馆区专属的客服活码二维码，并在联系信息栏填写电话号码或引导文案（支持换行）。</p>
-                    <p className="text-gray-400">💾 <strong>自动记忆：</strong>馆名、二维码、电话及引导文案会自动保存在浏览器中，下次在同一台电脑打开时自动恢复，无需重新填写。</p>
+                    <p>上传馆区专属的客服二维码，并在联系信息栏填写电话号码相关引导信息（支持换行）。</p>
+                    <p className="text-gray-400">💾 <strong>自动记忆：</strong>馆名、二维码、联系信息会自动保存在浏览器中，下次在同一台电脑打开时自动恢复，无需重新填写。</p>
                   </div>
                 )
               },
@@ -1620,7 +1637,7 @@ export default function PosterPage() {
 
           <DialogFooter>
             <Button className="bg-[#ff7670] hover:bg-[#e5635d] text-white px-8" onClick={() => setGuideOpen(false)}>
-              知道了，开始生成
+              知道了
             </Button>
           </DialogFooter>
         </DialogContent>
