@@ -79,7 +79,7 @@ export default function PosterPage() {
   // ---- 使用指南弹窗状态 ----
   const [guideOpen, setGuideOpen] = useState(false);
 
-  // ---- 海报数据状态 ----
+  // ---- 海报数据状态（服务端/客户端统一用默认值，避免 Hydration 错误）----
   const [posterData, setPosterData] = useState<PosterData>({
     readingRoom: "宁波市区文化路老约翰阅读馆",
     studentInfo: "赵涵语（二年级）",
@@ -92,7 +92,7 @@ export default function PosterPage() {
     teacherName: "老师评语：（老约翰阅读馆 萱萱老师）",
     teacherComment:
       "俊瑞，你真是一位想象力丰富又勇敢的探险家！习作不仅有闻气味、辨毒草这些生动的细节，更棒的是写出了自己从害怕到变厉害的心理成长。你的文字充满了力量，让老师也想跟着你去探险了！",
-    qrCode: "/qr-code.png",
+    qrCode: null,
     phone: "",
     footerText: "",
   });
@@ -984,6 +984,36 @@ export default function PosterPage() {
     }
   }, []);
 
+  // 客户端挂载后，从 localStorage 恢复馆名、二维码、联系信息
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("poster_prefs");
+      if (saved) {
+        const prefs = JSON.parse(saved);
+        setPosterData(prev => ({
+          ...prev,
+          ...(prefs.readingRoom ? { readingRoom: prefs.readingRoom } : {}),
+          // 只恢复用户上传的 base64，过滤掉旧版存入的默认占位路径
+          ...(prefs.qrCode && prefs.qrCode.startsWith("data:") ? { qrCode: prefs.qrCode } : {}),
+          ...(prefs.phone !== undefined ? { phone: prefs.phone } : {}),
+          ...(prefs.footerText !== undefined ? { footerText: prefs.footerText } : {}),
+        }));
+      }
+    } catch { /* 读取失败时静默使用默认值 */ }
+  }, []);
+
+  // 馆名、二维码、联系信息变化时自动保存到 localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("poster_prefs", JSON.stringify({
+        readingRoom: posterData.readingRoom,
+        qrCode: posterData.qrCode,
+        phone: posterData.phone,
+        footerText: posterData.footerText,
+      }));
+    } catch { /* 存储空间不足时静默忽略 */ }
+  }, [posterData.readingRoom, posterData.qrCode, posterData.phone, posterData.footerText]);
+
   /** 加载图库数据（首次打开图库弹窗时触发） */
   const loadGallery = useCallback(async () => {
     if (galleryLoaded) return;
@@ -1553,7 +1583,12 @@ export default function PosterPage() {
               },
               {
                 step: "06", title: "底部信息与二维码",
-                content: <p>上传馆区专属的客服活码二维码，并在联系信息栏填写电话号码或引导文案（支持换行）。</p>
+                content: (
+                  <div className="space-y-2">
+                    <p>上传馆区专属的客服活码二维码，并在联系信息栏填写电话号码或引导文案（支持换行）。</p>
+                    <p className="text-gray-400">💾 <strong>自动记忆：</strong>馆名、二维码、电话及引导文案会自动保存在浏览器中，下次在同一台电脑打开时自动恢复，无需重新填写。</p>
+                  </div>
+                )
               },
               {
                 step: "07", title: "预览与下载",
@@ -1578,6 +1613,7 @@ export default function PosterPage() {
               <p className="text-sm text-amber-700"><strong>文字太多？</strong>画布高度全自动适应，正文再长底板也会自动拉伸，不用担心文字被截断。</p>
               <p className="text-sm text-amber-700"><strong>手写稿方向不对？</strong>上传前请确保图片方向正向，裁切效果最佳。</p>
               <p className="text-sm text-amber-700"><strong>数据安全：</strong>海报在浏览器本地生成，不依赖外部服务器（智能识别除外），孩子作品隐私有保障。</p>
+              <p className="text-sm text-amber-700"><strong>换电脑或换浏览器？</strong>馆名等自动保存的信息仅存在当前浏览器中，换设备后需重新填写一次。</p>
             </div>
 
           </div>
@@ -1884,9 +1920,18 @@ export default function PosterPage() {
             <CardContent className="space-y-2 pb-3">
               <div className="flex items-center gap-2">
                 <Label className="text-xs shrink-0 w-14">二维码</Label>
-                <Input type="file" accept="image/*" onChange={e => handleImageUpload(e, "qrCode")} className="text-xs h-8 flex-1" />
-                {posterData.qrCode && (
-                  <Button variant="ghost" size="sm" onClick={() => setPosterData(p => ({ ...p, qrCode: null }))} className="text-red-500 shrink-0 h-7 text-[10px] px-1.5">清除</Button>
+                {posterData.qrCode ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <img src={posterData.qrCode} alt="二维码预览" className="w-10 h-10 object-cover rounded border border-gray-200" />
+                    <span className="text-xs text-gray-500 flex-1">已上传</span>
+                    <label className="cursor-pointer text-xs text-[#314F80] hover:underline shrink-0">
+                      替换
+                      <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "qrCode")} />
+                    </label>
+                    <Button variant="ghost" size="sm" onClick={() => setPosterData(p => ({ ...p, qrCode: null }))} className="text-red-500 shrink-0 h-7 text-[10px] px-1.5">清除</Button>
+                  </div>
+                ) : (
+                  <Input type="file" accept="image/*" onChange={e => handleImageUpload(e, "qrCode")} className="text-xs h-8 flex-1" />
                 )}
               </div>
               <div className="flex items-start gap-2">
