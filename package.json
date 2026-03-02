@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/generate-gallery.js",
     "dev": "next dev",
     "prebuild": "node scripts/generate-gallery.js",
     "build": "next build",

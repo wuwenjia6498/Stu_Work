@@ -6,11 +6,6 @@ const nextConfig = {
       bodySizeLimit: "20mb",
     },
   },
-  // 将 public/gallery 图片目录排除出所有 Serverless Function 的文件追踪
-  // 图片作为静态资源由 Vercel CDN 托管，函数只需读取小体积的 gallery-manifest.json
-  outputFileTracingExcludes: {
-    "*": ["./public/gallery/**/*"],
-  },
 };
 
 export default nextConfig;
