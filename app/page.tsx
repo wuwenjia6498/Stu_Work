@@ -1603,7 +1603,7 @@ export default function PosterPage() {
                 content: (
                   <div className="space-y-2">
                     <p>上传馆区专属的客服二维码，并在联系信息栏填写电话号码相关引导信息（支持换行）。</p>
-                    <p className="text-gray-400">💾 <strong>自动记忆：</strong>馆名、二维码、联系信息会自动保存在浏览器中，下次在同一台电脑打开时自动恢复，无需重新填写。</p>
+                    <p className="text-gray-400">💾 <strong>自动记忆：</strong>所有填写的文字内容（馆名、学员信息、正文、评语、联系信息等）及二维码，均会自动保存在当前浏览器中。刷新页面或下次打开，内容自动恢复，无需重复填写。图片（插图、手写稿）不保存，每次需重新上传。</p>
                   </div>
                 )
               },
@@ -1630,7 +1630,7 @@ export default function PosterPage() {
               <p className="text-sm text-amber-700"><strong>文字太多？</strong>画布高度全自动适应，正文再长底板也会自动拉伸，不用担心文字被截断。</p>
               <p className="text-sm text-amber-700"><strong>手写稿方向不对？</strong>上传前请确保图片方向正向，裁切效果最佳。</p>
               <p className="text-sm text-amber-700"><strong>数据安全：</strong>海报在浏览器本地生成，不依赖外部服务器（智能识别除外），孩子作品隐私有保障。</p>
-              <p className="text-sm text-amber-700"><strong>换电脑或换浏览器？</strong>馆名等自动保存的信息仅存在当前浏览器中，换设备后需重新填写一次。</p>
+              <p className="text-sm text-amber-700"><strong>换电脑或换浏览器？</strong>自动保存的内容仅存在当前设备的浏览器中，换设备或清除浏览器数据后需重新填写。</p>
             </div>
 
           </div>
