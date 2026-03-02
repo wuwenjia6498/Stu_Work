@@ -81,8 +81,8 @@ export default function PosterPage() {
 
   // ---- 海报数据状态 ----
   const [posterData, setPosterData] = useState<PosterData>({
-    readingRoom: "常德桃源县老约翰阅读馆",
-    studentInfo: "李俊瑞（二年级）",
+    readingRoom: "宁波市区文化路老约翰阅读馆",
+    studentInfo: "赵涵语（二年级）",
     bookTitle: "《玩具岛梦幻之旅》",
     mainTitle: "给爸爸妈妈的一封信",
     content:
@@ -754,7 +754,7 @@ export default function PosterPage() {
           const rImg = images["right"];
           ctx.beginPath();
           ctx.arc(circleCX, circleCY, circleRadius, 0, Math.PI * 2);
-          ctx.fillStyle = "#CCCCCC";
+          ctx.fillStyle = "#E8E8E8";
           ctx.fill();
 
           ctx.beginPath();
@@ -1533,7 +1533,7 @@ export default function PosterPage() {
                 )
               },
               {
-                step: "04", title: "配置展示图片",
+                step: "04", title: "编辑展示插图",
                 content: (
                   <div className="space-y-2">
                     <p><strong>左侧插图：</strong>点击 <span className="bg-gray-100 text-gray-700 text-xs px-1.5 py-0.5 rounded">内置图库</span> 从预设插图中挑选，或点击 <span className="bg-gray-100 text-gray-700 text-xs px-1.5 py-0.5 rounded">本地上传</span> 使用自备配图，上传后可进入裁切编辑器调整构图。</p>
