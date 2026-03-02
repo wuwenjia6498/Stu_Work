@@ -1077,13 +1077,16 @@ export default function PosterPage() {
     }
   }, []);
 
-  /** 添加一条历史记录（下载时调用） */
+  /** 添加一条历史记录（下载时调用）
+   * imageLeft / imageRight 不存入历史，避免 base64 大图撑爆 localStorage（5MB 限制）
+   * 需要时用户重新上传即可，缩略图已足够回顾内容
+   */
   const addHistoryItem = useCallback((thumbnail: string) => {
     const newItem: HistoryItem = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: Date.now(),
       thumbnail,
-      posterData: { ...posterData },
+      posterData: { ...posterData, imageLeft: null, imageRight: null },
     };
     const updated = [newItem, ...history].slice(0, MAX_HISTORY);
     setHistory(updated);
@@ -1093,12 +1096,11 @@ export default function PosterPage() {
   /** 加载历史记录到表单 */
   const loadHistoryItem = useCallback((item: HistoryItem) => {
     setPosterData({ ...item.posterData });
-    // 清除裁切相关原始图片引用（历史快照已包含裁切后的图）
     setOriginalImages({ imageLeft: null, imageRight: null });
     setFileNames({ imageLeft: "", imageRight: "" });
     setSelectedHistory(null);
     setHistoryDialogOpen(false);
-    toast.success("已加载历史记录");
+    toast.success("已加载历史记录（插图需重新上传）");
   }, []);
 
   /** 删除单条历史记录 */
