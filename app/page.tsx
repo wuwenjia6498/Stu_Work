@@ -421,7 +421,7 @@ export default function PosterPage() {
           drawRoundRect(ctx, imgAreaX, drawY, leftW, imgH, 12);
           ctx.clip();
           const lImg = images["left"];
-          const s = Math.max(leftW / lImg.width, imgH / lImg.height) * 0.85;
+          const s = Math.max(leftW / lImg.width, imgH / lImg.height);
           ctx.drawImage(lImg,
             imgAreaX + (leftW - lImg.width * s) / 2,
             drawY + (imgH - lImg.height * s) / 2,
@@ -741,7 +741,7 @@ export default function PosterPage() {
           drawRoundRect(ctx, imgAreaX, drawY, leftW, imgH, 12);
           ctx.clip();
           const lImg = images["left"];
-          const s = Math.max(leftW / lImg.width, imgH / lImg.height) * 0.85;
+          const s = Math.max(leftW / lImg.width, imgH / lImg.height);
           ctx.drawImage(lImg,
             imgAreaX + (leftW - lImg.width * s) / 2,
             drawY + (imgH - lImg.height * s) / 2,
@@ -1050,7 +1050,7 @@ export default function PosterPage() {
         }
       }
     } catch {
-      console.warn("图库数据加载失败");
+      toast.error("图库数据加载失败，请刷新页面重试");
     } finally {
       setGalleryLoaded(true);
     }
@@ -1220,6 +1220,12 @@ export default function PosterPage() {
   // ============================================================
 
   const commentDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (commentDebounceRef.current) clearTimeout(commentDebounceRef.current);
+    };
+  }, []);
 
   const handleGenerateComment = () => {
     if (!posterData.content.trim()) {
