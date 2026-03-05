@@ -1153,6 +1153,34 @@ export default function PosterPage() {
   // 手写稿 OCR 识别
   // ============================================================
 
+  /**
+   * 压缩图片：缩小尺寸 + JPEG 压缩，避免 base64 过大导致 413 错误
+   * OCR 不需要原图分辨率，2048px 长边 + 0.75 质量已足够识别手写文字
+   */
+  const compressImage = (file: File, maxDim = 2048, quality = 0.75): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const cvs = document.createElement("canvas");
+        cvs.width = width;
+        cvs.height = height;
+        const ctx = cvs.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(cvs.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("图片加载失败")); };
+      img.src = url;
+    });
+  };
+
   const handleOcrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1170,16 +1198,9 @@ export default function PosterPage() {
     setOcrLoading(true);
 
     try {
-      // 读取所有图片为 base64
+      // 压缩所有图片后转为 base64（避免原图过大导致请求超限）
       const base64List = await Promise.all(
-        fileArray.map(
-          (file) =>
-            new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.readAsDataURL(file);
-            })
-        )
+        fileArray.map((file) => compressImage(file))
       );
 
       const res = await fetch("/api/ai", {

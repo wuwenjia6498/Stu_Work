@@ -6,8 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 const AI_BASE_URL = "https://api.aihubmix.com/v1";
 
-/** OCR 使用非思考模型：速度快、token 利用率高、不易截断 */
-const OCR_MODEL = "gemini-2.0-flash";
+/** OCR 使用 2.5-flash：兼顾识别准确度与响应速度 */
+const OCR_MODEL = "gemini-2.5-flash";
 
 /** 评语生成使用思考模型：输出更有深度和针对性 */
 const COMMENT_MODEL = "gemini-2.5-pro";
