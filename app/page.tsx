@@ -1832,6 +1832,13 @@ export default function PosterPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-700 truncate">{fileNames.imageLeft || "已选择图片"}</p>
                       </div>
+                      <button
+                        className="shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                        onClick={() => handleClearImage("imageLeft")}
+                        title="移除图片"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
                     </div>
                     {/* 三个操作按钮：编辑（裁切）、从图库选择、本地替换 */}
                     <div className="grid grid-cols-3 gap-1.5">
@@ -1898,12 +1905,19 @@ export default function PosterPage() {
                     />
                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => replaceRightRef.current?.click()}>
                       <p className="text-xs text-gray-700 truncate">{fileNames.imageRight || "已上传图片"}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">点击替换 · 右侧编辑裁切</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">点击替换</p>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => handleReEdit("imageRight")} className="h-7 text-xs px-2 shrink-0">
                       <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       编辑
                     </Button>
+                    <button
+                      className="shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      onClick={() => handleClearImage("imageRight")}
+                      title="移除图片"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                   </div>
                 ) : (
                   <div className="mt-1">
