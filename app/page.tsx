@@ -378,13 +378,6 @@ export default function PosterPage() {
     }
     ctx.textAlign = "left";
 
-    drawY += 4;
-    ctx.strokeStyle = THEME_COLOR;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(POSTER_WIDTH / 2 - 30, drawY);
-    ctx.lineTo(POSTER_WIDTH / 2 + 30, drawY);
-    ctx.stroke();
     drawY += titleContentGap;
 
     ctx.fillStyle = "#333333";
