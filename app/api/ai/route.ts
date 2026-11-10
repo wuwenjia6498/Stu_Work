@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
     let model: string;
     let maxTokens: number;
     let temperature: number;
+    /** 思考强度：OCR 关闭思考以提速，评语保持模型默认 */
+    let reasoningEffort: string | undefined;
 
     if (type === "ocr") {
       // ---- 多模态请求：图片 OCR（快速模型，支持多图） ----
@@ -85,6 +87,8 @@ export async function POST(request: NextRequest) {
       // 多图时适当增大 token 上限
       maxTokens = images.length > 1 ? 8192 : 4096;
       temperature = 0;
+      // 看图抄写不需要推理：关闭思考，实测耗时从约 17s 降到约 3s，且不再占用 max_tokens
+      reasoningEffort = "minimal";
 
     } else if (type === "comment") {
       // ---- 纯文本请求：生成评语（思考模型） ----
@@ -134,6 +138,7 @@ export async function POST(request: NextRequest) {
         messages,
         max_tokens: maxTokens,
         temperature,
+        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       }),
     });
 
